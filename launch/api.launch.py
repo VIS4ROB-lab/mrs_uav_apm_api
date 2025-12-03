@@ -69,8 +69,8 @@ def generate_launch_description():
 
     # #{ args from ENV
 
-    uav_name=os.getenv('UAV_NAME', "uav1")
-    use_sim_time=os.getenv('USE_SIM_TIME', "false") == "true"
+    uav_name = os.getenv('UAV_NAME', "uav1")
+    use_sim_time = False
 
     # #} end of args from ENV
 
@@ -150,16 +150,16 @@ def generate_launch_description():
             )
     )
 
-    ld.add_action(
-        Node(
-            package='tf2_ros',
-            namespace='',
-            executable='static_transform_publisher',
-            name='fcu_to_garmin',
-            arguments=["0.0", "0.0625", "-0.009", "0", "1.5708", "-1.5708", uav_name + "/fcu", uav_name + "/garmin"],
-            condition=IfCondition(simulation)
-        )
-    )
+    # ld.add_action(
+    #     Node(
+    #         package='tf2_ros',
+    #         namespace='',
+    #         executable='static_transform_publisher',
+    #         name='fcu_to_garmin',
+    #         arguments=["0.0", "0.0625", "-0.009", "0", "1.5708", "-1.5708", uav_name + "/fcu", uav_name + "/garmin"],
+    #         condition=IfCondition(simulation)
+    #     )
+    # )
 
     return ld
 
