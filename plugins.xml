@@ -1,0 +1,5 @@
+<library path="MrsUavPx4Api_Api">
+  <class name="mrs_uav_px4_api::MrsUavPx4Api" type="mrs_uav_px4_api::MrsUavPx4Api" base_class_type="mrs_uav_hw_api::MrsUavHwApi">
+    <description>PX4 API module for the MRS UAV System</description>
+  </class>
+</library>
