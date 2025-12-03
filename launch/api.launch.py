@@ -24,7 +24,7 @@ def generate_launch_description():
 
     ld = launch.LaunchDescription()
 
-    pkg_name = "mrs_uav_px4_api"
+    pkg_name = "mrs_uav_apm_api"
 
     this_pkg_path = get_package_share_directory(pkg_name)
 
@@ -76,7 +76,7 @@ def generate_launch_description():
 
     # the first one has the priority
     configs = [
-        this_pkg_path + '/config/px4_api.yaml',
+        this_pkg_path + '/config/apm_api.yaml',
         get_package_share_directory("mrs_uav_hw_api") + "/config/hw_api.yaml",
     ]
 
@@ -141,7 +141,7 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
                 PathJoinSubstitution([
-                    FindPackageShare('mrs_uav_px4_api'),
+                    FindPackageShare('mrs_uav_apm_api'),
                     'launch',
                     'mavros_realworld.launch.py'
                     ])

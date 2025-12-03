@@ -1,8 +1,8 @@
-# Common configuration for PX4 autopilot
+# Common configuration for APM autopilot
 #
 /**:
   ros__parameters:
-    startup_px4_usb_quirk: false
+    startup_apm_usb_quirk: false
 
 # --- system plugins ---
 
@@ -102,7 +102,7 @@
 /**/setpoint_raw:
   ros__parameters:
     thrust_scaling: 1.0       # used in setpoint_raw attitude callback.
-    # Note: PX4 expects normalized thrust values between 0 and 1, which means that
+    # Note: APM expects normalized thrust values between 0 and 1, which means that
     # the scaling needs to be unitary and the inputs should be 0..1 as well.
 
 # setpoint_position
@@ -163,7 +163,7 @@
 # image_pub
 /**/image:
   ros__parameters:
-    frame_id: "px4flow"
+    frame_id: "apmflow"
 
 # fake_gps
 /**/fake_gps:
@@ -227,10 +227,10 @@
     fcu.odom_child_id_des: "base_link"    # desired child frame rotation of the FCU's odometry
     fcu.map_id_des: "odom"    # desired child frame rotation of the FCU's odometry
 
-# px4flow
-/**/px4flow:
+# apmflow
+/**/apmflow:
   ros__parameters:
-    frame_id: "px4flow"
+    frame_id: "apmflow"
     ranger_fov: 0.118682      # 6.8 degrees at 5 meters, 31 degrees at 1 meter
     ranger_min_range: 0.3     # meters
     ranger_max_range: 5.0     # meters

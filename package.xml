@@ -2,9 +2,9 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
 
-  <name>mrs_uav_px4_api</name>
+  <name>mrs_uav_apm_api</name>
   <version>2.0.0</version>
-  <description>PX4 API for MRS UAV System</description>
+  <description>APM API for MRS UAV System</description>
 
   <author email="tomas.baca@fel.cvut.cz">Tomas Baca</author>
   <maintainer email="tomas.baca@fel.cvut.cz">Tomas Baca</maintainer>

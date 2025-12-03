@@ -1,6 +1,6 @@
-# MRS UAV PX4 API Plugin
+# MRS UAV APM API Plugin
 
-[MRS HW Api](https://github.com/ctu-mrs/mrs_uav_hw_api) plugin for interfacing the [UAV Core](https://github.com/ctu-mrs/mrs_uav_core) with the PX4 autopilot.
+[MRS HW Api](https://github.com/ctu-mrs/mrs_uav_hw_api) plugin for interfacing the [UAV Core](https://github.com/ctu-mrs/mrs_uav_core) with the APM autopilot.
 
 > :warning: **Attention please: This README is outdated.**
 >

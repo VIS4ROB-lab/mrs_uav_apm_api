@@ -29,7 +29,7 @@
       # - rangefinder
       # - vision_speed_estimate
       # - vision_pose_estimate
-      # - px4flow
+      # - apmflow
       # - mocap_pose_estimate
       # - cam_imu_sync
       # - fake_gps

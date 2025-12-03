@@ -1,4 +1,4 @@
-hw_interface_plugin: "mrs_uav_px4_api::MrsUavPx4Api"
+hw_interface_plugin: "mrs_uav_apm_api::MrsUavApmApi"
 plugin:
 
   mavros_timeout: 1.0 # [s]

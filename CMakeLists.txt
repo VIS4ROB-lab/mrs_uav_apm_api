@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(mrs_uav_px4_api)
+project(mrs_uav_apm_api)
 
 # set the correct standards
 set(CMAKE_C_STANDARD 99)
@@ -16,7 +16,7 @@ endif()
 set(USE_ROS_TIMER 0)
 
 if(${USE_ROS_TIMER})
-  MESSAGE(WARNING "[mrs_uav_px4_api]: Compiling with ROS Timers. This can cause high CPU load in runtime.")
+  MESSAGE(WARNING "[mrs_uav_apm_api]: Compiling with ROS Timers. This can cause high CPU load in runtime.")
 endif()
 
 if(MRS_ENABLE_TESTING)
@@ -49,7 +49,7 @@ set(DEPENDENCIES
 )
 
 set(LIBRARIES
-  MrsUavPx4Api_Api
+  MrsUavApmApi_Api
 )
 
 foreach(DEP IN LISTS DEPENDENCIES)
@@ -64,15 +64,15 @@ include_directories(
 
 # Plugin
 
-add_library(MrsUavPx4Api_Api SHARED
+add_library(MrsUavApmApi_Api SHARED
   src/api.cpp
 )
 
-ament_target_dependencies(MrsUavPx4Api_Api
+ament_target_dependencies(MrsUavApmApi_Api
   ${DEPENDENCIES}
 )
 
-target_compile_definitions(MrsUavPx4Api_Api PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+target_compile_definitions(MrsUavApmApi_Api PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
 ## --------------------------------------------------------------
 ## |                       Export plugins                       |
