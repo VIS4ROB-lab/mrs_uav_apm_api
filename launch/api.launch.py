@@ -59,7 +59,7 @@ def generate_launch_description():
 
     declare_simulation = DeclareLaunchArgument(
         'simulation',
-        default_value="true" if os.getenv('RUN_TYPE', "simulation") == "simulation" else "false",
+        default_value="false",
         description='Whether to start a as a simulation or load into an existing container.'
     )
 
@@ -137,18 +137,18 @@ def generate_launch_description():
 
     ))
 
-    ld.add_action(
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([
-                PathJoinSubstitution([
-                    FindPackageShare('mrs_uav_apm_api'),
-                    'launch',
-                    'mavros_realworld.launch.py'
-                    ])
-                ]),
-            condition=UnlessCondition(simulation)
-            )
-    )
+    # ld.add_action(
+    #     IncludeLaunchDescription(
+    #         PythonLaunchDescriptionSource([
+    #             PathJoinSubstitution([
+    #                 FindPackageShare('mrs_uav_apm_api'),
+    #                 'launch',
+    #                 'mavros_realworld.launch.py'
+    #                 ])
+    #             ]),
+    #         condition=UnlessCondition(simulation)
+    #         )
+    # )
 
     # ld.add_action(
     #     Node(
