@@ -1,7 +1,7 @@
 hw_interface_plugin: "mrs_uav_apm_api::MrsUavApmApi"
 plugin:
 
-  mavros_timeout: 10.0 # [s]
+  mavros_timeout: 1.0 # [s]
   mavros_passable_delay: 1.0 # [s]
   
   gnss:
