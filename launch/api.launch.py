@@ -114,7 +114,7 @@ def generate_launch_description():
                   ("~/ground_truth_in", "ground_truth" if simulation else "rtk/bestpos"),
                   ("~/mavros_state_in", "mavros/state"),
                   ("~/mavros_local_position_in", "mavros/local_position/odom"),
-                  ("~/mavros_odometry_in", "mavros/odometry/in"),
+                  ("~/mavros_odometry_in", "mavros/local_position/odom"),
                   ("~/mavros_global_position_in", "mavros/global_position/global"),
                   ("~/mavros_garmin_in", "mavros/garmin"),
                   ("~/mavros_imu_in", "mavros/imu/data"),
