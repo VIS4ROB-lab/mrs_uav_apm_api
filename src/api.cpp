@@ -633,14 +633,15 @@ std::tuple<bool, std::string> MrsUavApmApi::callbackArming(
   auto srv_out = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
 
   // when REALWORLD AND ARM:=TRUE
-  if (!_simulation_ && request) {
-    ss << "can not arm by service when not in simulation! You should arm the "
-          "drone by the RC controller only!";
-    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
-                                 "" << ss.str());
+  // if (!_simulation_ && request) {
+  //   ss << "can not arm by service when not in simulation! You should arm the
+  //   "
+  //         "drone by the RC controller only!";
+  //   RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
+  //                                "" << ss.str());
 
-    return {false, ss.str()};
-  }
+  //   return {false, ss.str()};
+  // }
 
   srv_out->broadcast = false;
   srv_out->command = 400;  // the code for arming
