@@ -4,7 +4,7 @@ import launch
 import os
 import launch_ros
 
-from launch_ros.actions import Node, PushROSNamespace, SetParameter
+from launch_ros.actions import Node, SetParameter
 from launch.actions import GroupAction, IncludeLaunchDescription, DeclareLaunchArgument
 from launch.substitutions import (
     LaunchConfiguration,
@@ -39,21 +39,16 @@ def generate_launch_description():
 
     print(apm_launch_arguments.items())
 
-    launch_xml_include_with_namespace = GroupAction(
-        actions=[
-            PushROSNamespace(uav_name),
-            IncludeLaunchDescription(
-                XMLLaunchDescriptionSource(
-                    os.path.join(
-                        get_package_share_directory('eagleeye_tools'),
-                        'launch/mavros.launch')
-                    ),
-                    launch_arguments=apm_launch_arguments.items()
-            ),
-        ],
+    ld.add_action(
+        IncludeLaunchDescription(
+            XMLLaunchDescriptionSource(
+                os.path.join(
+                    get_package_share_directory('eagleeye_tools'),
+                    'launch/mavros.launch')
+                ),
+                launch_arguments=apm_launch_arguments.items()
+        )
     )
-
-    ld.add_action(launch_xml_include_with_namespace)
 
     return ld
 
