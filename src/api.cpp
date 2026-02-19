@@ -20,6 +20,7 @@
 #include <mavros_msgs/msg/altitude.hpp>
 #include <mavros_msgs/msg/attitude_target.hpp>
 #include <mavros_msgs/msg/gpsraw.hpp>
+#include <mavros_msgs/msg/position_target.hpp>
 #include <mavros_msgs/msg/rc_in.hpp>
 #include <mavros_msgs/msg/state.hpp>
 #include <mavros_msgs/srv/command_long.hpp>
@@ -93,6 +94,8 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
       const mrs_msgs::msg::HwApiVelocityHdgCmd::ConstSharedPtr msg);
   bool callbackPositionCmd(
       const mrs_msgs::msg::HwApiPositionCmd::ConstSharedPtr msg);
+  bool callbackTrajectoryCmd(
+      const mrs_msgs::msg::HwApiTrajectoryCmd::ConstSharedPtr msg);
 
   void callbackTrackerCmd(
       const mrs_msgs::msg::TrackerCommand::ConstSharedPtr msg);
@@ -183,6 +186,8 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
       ph_mavros_attitude_target_;
   mrs_lib::PublisherHandler<mavros_msgs::msg::ActuatorControl>
       ph_mavros_actuator_control_;
+  mrs_lib::PublisherHandler<mavros_msgs::msg::PositionTarget>
+      ph_mavros_position_target_;
 
   // | ------------------------- timers ------------------------- |
 
@@ -390,6 +395,9 @@ void MrsUavApmApi::initialize(
   ph_mavros_actuator_control_ =
       mrs_lib::PublisherHandler<mavros_msgs::msg::ActuatorControl>(
           node_, "~/mavros_actuator_control_out");
+  ph_mavros_position_target_ =
+      mrs_lib::PublisherHandler<mavros_msgs::msg::PositionTarget>(
+          node_, "~/mavros_position_setpoint_out");
 
   // | ----------------------- finish init ---------------------- |
 
@@ -613,6 +621,49 @@ bool MrsUavApmApi::callbackPositionCmd(
   RCLCPP_INFO_ONCE(node_->get_logger(), "getting position cmd");
 
   return false;
+}
+
+//}
+
+/* callbackTrajectoryCmd() //{ */
+
+bool MrsUavApmApi::callbackTrajectoryCmd(
+    [[maybe_unused]] const mrs_msgs::msg::HwApiTrajectoryCmd::ConstSharedPtr
+        msg) {
+  RCLCPP_INFO_ONCE(node_->get_logger(), "getting trajectory cmd");
+
+  if (!_capabilities_.accepts_trajectory_cmd) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000,
+                          "trajectory input is not enabled in the config file");
+    return false;
+  }
+
+  mavros_msgs::msg::PositionTarget position_target;
+
+  position_target.header.frame_id = "base_link";
+  position_target.header.stamp = msg->stamp;
+
+  position_target.position.x = msg->position.x;
+  position_target.position.y = msg->position.y;
+  position_target.position.z = msg->position.z;
+
+  position_target.position.x = msg->position.x;
+  position_target.position.y = msg->position.y;
+  position_target.position.z = msg->position.z;
+
+  position_target.position.x = msg->position.x;
+  position_target.position.y = msg->position.y;
+  position_target.position.z = msg->position.z;
+
+  attitude_target.thrust = msg->throttle;
+
+  attitude_target.type_mask = attitude_target.IGNORE_YAW_RATE |
+                              attitude_target.IGNORE_ROLL_RATE |
+                              attitude_target.IGNORE_PITCH_RATE;
+
+  ph_mavros_position_target_.publish(position_target);
+
+  return true;
 }
 
 //}

@@ -2,7 +2,6 @@
   ros__parameters:
     plugin_allowlist:
       # core
-      - actuator_control
       - altitude
       - attitude
       - command
@@ -11,7 +10,6 @@
       - imu
       - local_position
       - manual_control
-      - param
       - rc_io
       - setpoint_accel
       - setpoint_attitude
@@ -22,19 +20,19 @@
       - sys_time
 
       # mavros_extras
-      - distance_sensor
       - gps_input
       - gps_rtk
       - gps_status
       - mag_calibration_status
       - odometry
-      - vision_pose_estimate
+      - vision_pose
 
     # plugin_denylist:
       
       # # common
+      # - param
       # - 3dr_radio
-      # # - actuator_control
+      # - actuator_control
       # - hil
       # - ftp
       # - manual_control
@@ -55,21 +53,21 @@
       # # extras
       # - image_pub
       # - vibration
-      # # - distance_sensor
+      # - distance_sensor
       # - rangefinder
       # - vision_speed_estimate
       # - apmflow
       # - mocap_pose_estimate
       # - cam_imu_sync
       # - fake_gps
-      # # - gps_rtk
+      # - gps_rtk
       # - obstacle_distance
       # - servo_state_publisher
       # - companion_process_status
       # - wheel_odometry
       # - trajectory
-      # # - odom
+      # - odom
       # - adsb
-      # # - debug_value
+      # - debug_value
       # - wind_estimation
       # - log_transfer

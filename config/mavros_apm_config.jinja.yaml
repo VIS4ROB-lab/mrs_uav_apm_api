@@ -1,4 +1,4 @@
-# Common configuration for APM2 autopilot
+# Common configuration for PX4 autopilot
 #
 /**:
   ros__parameters:
@@ -18,7 +18,7 @@
 # sys_time
 /**/time:
   ros__parameters:
-    time_ref_source: "fcu"    # time_reference source
+    time_ref_source: "{{ uav_name }}/fcu"    # time_reference source
     timesync_mode: MAVLINK
     timesync_avg_alpha: 0.6   # timesync averaging factor
     timesync_rate: 10.0       # TIMESYNC rate in Hertz (feature disabled if 0.0)
@@ -48,20 +48,20 @@
 # global_position
 /**/global_position:
   ros__parameters:
-    frame_id: "map"               # origin frame
-    child_frame_id: "base_link"   # body-fixed frame
+    frame_id: "{{ uav_name }}/map"               # origin frame
+    child_frame_id: "{{ uav_name }}/base_link"   # body-fixed frame
     rot_covariance: 99999.0       # covariance for attitude?
     gps_uere: 1.0                 # User Equivalent Range Error (UERE) of GPS sensor (m)
     use_relative_alt: true        # use relative altitude for local coordinates
     tf.send: false                # send TF?
-    tf.frame_id: "map"            # TF frame_id
-    tf.global_frame_id: "earth"   # TF earth frame_id
-    tf.child_frame_id: "base_link"  # TF child_frame_id
+    tf.frame_id: "{{ uav_name }}/map"            # TF frame_id
+    tf.global_frame_id: "{{ uav_name }}/earth"   # TF earth frame_id
+    tf.child_frame_id: "{{ uav_name }}/base_link"  # TF child_frame_id
 
 # imu_pub
 /**/imu:
   ros__parameters:
-    frame_id: "base_link"
+    frame_id: "{{ uav_name }}/base_link"
     # need find actual values
     linear_acceleration_stdev: 0.0003
     angular_velocity_stdev: 0.0003490659  # 0.02 degrees
@@ -71,10 +71,10 @@
 # local_position
 /**/local_position:
   ros__parameters:
-    frame_id: "map"
+    frame_id: "{{ uav_name }}/map"
     tf.send: false
-    tf.frame_id: "map"
-    tf.child_frame_id: "base_link"
+    tf.frame_id: "{{ uav_name }}/map"
+    tf.child_frame_id: "{{ uav_name }}/base_link"
     tf.send_fcu: false
 
 # param
@@ -94,21 +94,23 @@
     reverse_thrust: false       # allow reversed thrust
     use_quaternion: false       # enable PoseStamped topic subscriber
     tf.listen: false            # enable tf listener (disable topic subscribers)
-    tf.frame_id: "map"
-    tf.child_frame_id: "target_attitude"
+    tf.frame_id: "{{ uav_name }}/map"
+    tf.child_frame_id: "{{ uav_name }}/target_attitude"
     tf.rate_limit: 50.0
 
 # setpoint_raw
 /**/setpoint_raw:
   ros__parameters:
-    thrust_scaling: 1.0         # specify thrust scaling (normalized, 0 to 1) for thrust (like PX4)
+    thrust_scaling: 1.0       # used in setpoint_raw attitude callback.
+    # Note: PX4 expects normalized thrust values between 0 and 1, which means that
+    # the scaling needs to be unitary and the inputs should be 0..1 as well.
 
 # setpoint_position
 /**/setpoint_position:
   ros__parameters:
     tf.listen: false            # enable tf listener (disable topic subscribers)
-    tf.frame_id: "map"
-    tf.child_frame_id: "target_position"
+    tf.frame_id: "{{ uav_name }}/map"
+    tf.child_frame_id: "{{ uav_name }}/target_position"
     tf.rate_limit: 50.0
     mav_frame: LOCAL_NED
 
@@ -116,8 +118,8 @@
 /**/guided_target:
   ros__parameters:
     tf.listen: false           # enable tf listener (disable topic subscribers)
-    tf.frame_id: "map"
-    tf.child_frame_id: "target_position"
+    tf.frame_id: "{{ uav_name }}/map"
+    tf.child_frame_id: "{{ uav_name }}/target_position"
     tf.rate_limit: 50.0
 
 # setpoint_velocity
@@ -152,16 +154,16 @@
     config: |
       garmin:
         id: 0
-        frame_id: "garmin"
-        orientation: PITCH_270
+        frame_id: "{{ uav_name }}/garmin"
+        orientation: CUSTOM
         field_of_view: 0.0
         send_tf: false
-        sensor_position: {x:  0.0, y:  0.0, z:  -0.1}
+        sensor_position: {x: 0.0, y: 0.0625, z: -0.009}
 
 # image_pub
 /**/image:
   ros__parameters:
-    frame_id: "px4flow"
+    frame_id: "{{ uav_name }}/px4flow"
 
 # fake_gps
 /**/fake_gps:
@@ -180,8 +182,8 @@
     fix_type: 3             # type of GPS fix (default: 3D)
     tf.listen: false
     tf.send: false           # send TF?
-    tf.frame_id: "map"       # TF frame_id
-    tf.child_frame_id: "fix" # TF child_frame_id
+    tf.frame_id: "{{ uav_name }}/map"       # TF frame_id
+    tf.child_frame_id: "{{ uav_name }}/fix" # TF child_frame_id
     tf.rate_limit: 10.0      # TF rate
     gps_rate: 5.0           # GPS data publishing rate
 
@@ -197,8 +199,8 @@
     camera.fov_y: 2.0071286398
     tf.send: true
     tf.listen: false
-    tf.frame_id: "landing_target"
-    tf.child_frame_id: "camera_center"
+    tf.frame_id: "{{ uav_name }}/landing_target"
+    tf.child_frame_id: "{{ uav_name }}/camera_center"
     tf.rate_limit: 10.0
     target_size: {x: 0.3, y: 0.3}
 
@@ -221,14 +223,14 @@
 # odom
 /**/odometry:
   ros__parameters:
-    fcu.odom_parent_id_des: "map"   # desired parent frame rotation of the FCU's odometry
-    fcu.odom_child_id_des: "base_link"    # desired child frame rotation of the FCU's odometry
-    fcu.map_id_des: "odom"    # desired child frame rotation of the FCU's odometry
+    fcu.odom_parent_id_des: "{{ uav_name }}/map"   # desired parent frame rotation of the FCU's odometry
+    fcu.odom_child_id_des: "{{ uav_name }}/base_link"    # desired child frame rotation of the FCU's odometry
+    fcu.map_id_des: "{{ uav_name }}/odom"    # desired child frame rotation of the FCU's odometry
 
 # px4flow
 /**/px4flow:
   ros__parameters:
-    frame_id: "px4flow"
+    frame_id: "{{ uav_name }}/px4flow"
     ranger_fov: 0.118682      # 6.8 degrees at 5 meters, 31 degrees at 1 meter
     ranger_min_range: 0.3     # meters
     ranger_max_range: 5.0     # meters
@@ -237,8 +239,8 @@
 /**/vision_pose:
   ros__parameters:
     tf.listen: false           # enable tf listener (disable topic subscribers)
-    tf.frame_id: "odom"
-    tf.child_frame_id: "vision_estimate"
+    tf.frame_id: "{{ uav_name }}/odom"
+    tf.child_frame_id: "{{ uav_name }}/vision_estimate"
     tf.rate_limit: 10.0
 
 # vision_speed_estimate
@@ -250,7 +252,7 @@
 # vibration
 /**/vibration:
   ros__parameters:
-    frame_id: "base_link"
+    frame_id: "{{ uav_name }}/base_link"
 
 # wheel_odometry
 /**/wheel_odometry:
@@ -261,14 +263,15 @@
     wheel1: {x: 0.0, y:  0.15, radius: 0.05}  # x-, y-offset (m,NED) and radius (m)
     send_raw: true                # send wheel's RPM and cumulative distance (~/wheel_odometry/rpm, ~/wheel_odometry/distance)
     send_twist: false             # send geometry_msgs/TwistWithCovarianceStamped instead of nav_msgs/Odometry
-    frame_id: "odom"               # origin frame
-    child_frame_id: "base_link"   # body-fixed frame
+    frame_id: "{{ uav_name }}/odom"              # origin frame
+    child_frame_id: "{{ uav_name }}/base_link"   # body-fixed frame
     vel_error: 0.1                # wheel velocity measurement error 1-std (m/s)
-    tf.send: true
-    tf.frame_id: "odom"
-    tf.child_frame_id: "base_link"
+    tf.send: false
+    tf.frame_id: "{{ uav_name }}/odom"
+    tf.child_frame_id: "{{ uav_name }}/base_link"
 
 # camera
 /**/camera:
   ros__parameters:
-    frame_id: "base_link"
+    frame_id: "{{ uav_name }}/base_link"
+

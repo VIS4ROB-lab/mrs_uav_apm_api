@@ -2,7 +2,7 @@ hw_interface_plugin: "mrs_uav_apm_api::MrsUavApmApi"
 plugin:
 
   mavros_timeout: 1.0 # [s]
-  mavros_passable_delay: 1.0 # [s]
+  mavros_passable_delay: 0.05 # [s]
   
   gnss:
     utm_zone: "32T"
@@ -12,8 +12,9 @@ plugin:
   
   input_mode:
     control_group: false
-    attitude_rate: true
-    attitude:      true
+    attitude_rate: false
+    attitude:      false
+    trajectory:    true
   
   outputs:
     distance_sensor:      true

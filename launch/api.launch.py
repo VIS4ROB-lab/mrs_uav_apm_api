@@ -59,7 +59,7 @@ def generate_launch_description():
 
     declare_simulation = DeclareLaunchArgument(
         'simulation',
-        default_value="false",
+        default_value="true" if os.getenv('RUN_TYPE', "simulation") == "simulation" else "false",
         description='Whether to start a as a simulation or load into an existing container.'
     )
 
@@ -67,13 +67,25 @@ def generate_launch_description():
 
     # #} end of simulation
 
+    # #{ fcu_url
+
+    fcu_url = LaunchConfiguration('fcu_url')
+
+    ld.add_action(DeclareLaunchArgument(
+        'fcu_url',
+        default_value="/dev/pixhawk:921600",
+        description='FCU connection URL (e.g., /dev/pixhawk:921600)'
+    ))
+
+    # #} end of fcu_url
+
     # #{ args from ENV
 
-    uav_name = os.getenv('UAV_NAME', "uav1")
-    use_sim_time = False
+    uav_name=os.getenv('UAV_NAME', "uav1")
+    use_sim_time=os.getenv('USE_SIM_TIME', "false") == "true"
 
     # #} end of args from ENV
-
+    
     # the first one has the priority
     configs = [
         this_pkg_path + '/config/apm_api.yaml',
@@ -114,7 +126,7 @@ def generate_launch_description():
                   ("~/ground_truth_in", "ground_truth" if simulation else "rtk/bestpos"),
                   ("~/mavros_state_in", "mavros/state"),
                   ("~/mavros_local_position_in", "mavros/local_position/odom"),
-                  ("~/mavros_odometry_in", "mavros/local_position/odom"),
+                  ("~/mavros_odometry_in", "mavros/odometry/in"),
                   ("~/mavros_global_position_in", "mavros/global_position/global"),
                   ("~/mavros_garmin_in", "mavros/garmin"),
                   ("~/mavros_imu_in", "mavros/imu/data"),
@@ -127,6 +139,7 @@ def generate_launch_description():
 
                   ("~/mavros_cmd_out", "mavros/cmd/command"),
                   ("~/mavros_set_mode_out", "mavros/set_mode"),
+                  ("~/mavros_local_setpoint_out", "mavros/setpoint_raw/local"),
                   ("~/mavros_attitude_setpoint_out", "mavros/setpoint_raw/attitude"),
                   ("~/mavros_actuator_control_out", "mavros/actuator_control"),
 
@@ -137,29 +150,39 @@ def generate_launch_description():
 
     ))
 
-    # ld.add_action(
-    #     IncludeLaunchDescription(
-    #         PythonLaunchDescriptionSource([
-    #             PathJoinSubstitution([
-    #                 FindPackageShare('mrs_uav_apm_api'),
-    #                 'launch',
-    #                 'mavros_realworld.launch.py'
-    #                 ])
-    #             ]),
-    #         condition=UnlessCondition(simulation)
-    #         )
-    # )
-
-    # ld.add_action(
-    #     Node(
-    #         package='tf2_ros',
-    #         namespace='',
-    #         executable='static_transform_publisher',
-    #         name='fcu_to_garmin',
-    #         arguments=["0.0", "0.0625", "-0.009", "0", "1.5708", "-1.5708", uav_name + "/fcu", uav_name + "/garmin"],
-    #         condition=IfCondition(simulation)
-    #     )
-    # )
+    # Determine which MAVROS launch file to include based on simulation parameter
+    # Only include one to avoid parsing both launch files
+    simulation_value = os.getenv('RUN_TYPE', "simulation") == "simulation"
+    
+    if simulation_value:
+        # Include MAVROS for simulation (SITL with UDP)
+        ld.add_action(
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution([
+                        FindPackageShare('mrs_uav_apm_api'),
+                        'launch',
+                        'mavros_sitl.launch.py'
+                    ])
+                )
+            )
+        )
+    else:
+        # Include MAVROS for real-world (hardware via serial)
+        ld.add_action(
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution([
+                        FindPackageShare('mrs_uav_apm_api'),
+                        'launch',
+                        'mavros_realworld.launch.py'
+                    ])
+                ),
+                launch_arguments={
+                    'fcu_url': fcu_url,
+                }.items()
+            )
+        )
 
     return ld
 
