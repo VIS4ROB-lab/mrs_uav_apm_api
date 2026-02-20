@@ -749,7 +749,7 @@ std::tuple<bool, std::string> MrsUavApmApi::callbackOffboard(void) {
   auto srv_out = std::make_shared<mavros_msgs::srv::SetMode::Request>();
 
   srv_out->base_mode = 0;
-  srv_out->custom_mode = "GUIDED_NOGPS";
+  srv_out->custom_mode = "GUIDED";
 
   bool success = false;
 
@@ -824,7 +824,7 @@ void MrsUavApmApi::timeoutMavrosState(void) {
     RCLCPP_WARN_THROTTLE(
         node_->get_logger(), *clock_, 1000,
         "The Mavros state should be supplied at 100 Hz to provided fast "
-        "refresh rate on the state of the GUIDED_NOGPS mode.");
+        "refresh rate on the state of the GUIDED mode.");
     RCLCPP_WARN_THROTTLE(
         node_->get_logger(), *clock_, 1000,
         "If missing, the UAV could be disarmed by safety routines while not "
@@ -865,7 +865,7 @@ void MrsUavApmApi::callbackMavrosState(
   {
     std::scoped_lock lock(mutex_status_);
 
-    offboard_ = msg->mode == "GUIDED_NOGPS";
+    offboard_ = msg->mode == "GUIDED";
     armed_ = msg->armed;
     connected_ = true;
     mode_ = msg->mode;

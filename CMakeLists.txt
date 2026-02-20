@@ -32,6 +32,7 @@ if(COVERAGE)
 endif()
 
 set(DEPENDENCIES
+  geographic_msgs
   rclcpp
   rclcpp_components
   geometry_msgs
@@ -89,6 +90,7 @@ ament_export_libraries(
 )
 
 add_executable(mavros_stream_enforcer src/mavros_stream_enforcer.cpp)
+add_executable(gp_origin_setter src/gp_origin_setter.cpp)
 
 ament_target_dependencies(
   mavros_stream_enforcer
@@ -96,8 +98,15 @@ ament_target_dependencies(
   mavros_msgs
 )
 
+ament_target_dependencies(
+  gp_origin_setter
+  rclcpp
+  sensor_msgs
+  geographic_msgs
+)
+
 install(
-  TARGETS mavros_stream_enforcer
+  TARGETS mavros_stream_enforcer gp_origin_setter
   DESTINATION lib/${PROJECT_NAME}
 )
 
