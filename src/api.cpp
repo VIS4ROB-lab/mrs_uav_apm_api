@@ -641,25 +641,26 @@ bool MrsUavApmApi::callbackTrajectoryCmd(
   mavros_msgs::msg::PositionTarget position_target;
 
   position_target.header.frame_id = "base_link";
-  position_target.header.stamp = msg->stamp;
+  position_target.header.stamp = msg->header.stamp;
+
+  position_target.coordinate_frame =
+      mavros_msgs::msg::PositionTarget::FRAME_BODY_NED;
+  position_target.type_mask = 0;
 
   position_target.position.x = msg->position.x;
   position_target.position.y = msg->position.y;
   position_target.position.z = msg->position.z;
 
-  position_target.position.x = msg->position.x;
-  position_target.position.y = msg->position.y;
-  position_target.position.z = msg->position.z;
+  position_target.velocity.x = msg->velocity.x;
+  position_target.velocity.y = msg->velocity.y;
+  position_target.velocity.z = msg->velocity.z;
 
-  position_target.position.x = msg->position.x;
-  position_target.position.y = msg->position.y;
-  position_target.position.z = msg->position.z;
+  position_target.acceleration_or_force.x = msg->acceleration.x;
+  position_target.acceleration_or_force.y = msg->acceleration.y;
+  position_target.acceleration_or_force.z = msg->acceleration.z;
 
-  attitude_target.thrust = msg->throttle;
-
-  attitude_target.type_mask = attitude_target.IGNORE_YAW_RATE |
-                              attitude_target.IGNORE_ROLL_RATE |
-                              attitude_target.IGNORE_PITCH_RATE;
+  position_target.yaw = msg->heading;
+  position_target.yaw_rate = msg->heading_rate;
 
   ph_mavros_position_target_.publish(position_target);
 
