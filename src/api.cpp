@@ -267,6 +267,8 @@ void MrsUavApmApi::initialize(
                                (bool&)_capabilities_.accepts_attitude_rate_cmd);
   local_param_loader.loadParam("input_mode/attitude",
                                (bool&)_capabilities_.accepts_attitude_cmd);
+  local_param_loader.loadParam("input_mode/trajectory",
+                               (bool&)_capabilities_.accepts_trajectory_cmd);
 
   local_param_loader.loadParam("outputs/distance_sensor",
                                (bool&)_capabilities_.produces_distance_sensor);
