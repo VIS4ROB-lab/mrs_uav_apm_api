@@ -39,7 +39,6 @@ set(DEPENDENCIES
   mavros_msgs
   mrs_lib
   mrs_msgs
-  # mrs_modules_msgs
   mrs_uav_hw_api
   nav_msgs
   pluginlib
@@ -87,6 +86,19 @@ pluginlib_export_plugin_description_file(mrs_uav_hw_api plugins.xml)
 
 ament_export_libraries(
   ${LIBRARIES}
+)
+
+add_executable(mavros_stream_enforcer src/mavros_stream_enforcer.cpp)
+
+ament_target_dependencies(
+  mavros_stream_enforcer
+  rclcpp
+  mavros_msgs
+)
+
+install(
+  TARGETS mavros_stream_enforcer
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 install(

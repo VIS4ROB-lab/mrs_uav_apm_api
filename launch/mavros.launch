@@ -25,7 +25,6 @@
 		<param name="tgt_component" value="$(var tgt_component)" />
 		<param name="fcu_protocol" value="$(var fcu_protocol)" />
 		<param name="use_sim_time" value="$(var use_sim_time)" />
-		<param name="stream_rate" value="0"/>
 		
 		<param name="base_link_frame_id" value="$(var base_link_frame_id)" />
 		<param name="odom_frame_id" value="$(var odom_frame_id)" />

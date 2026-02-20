@@ -7,7 +7,7 @@ import tempfile
 from jinja2 import Environment, FileSystemLoader
 
 from launch_ros.actions import Node, SetParameter
-from launch.actions import GroupAction, IncludeLaunchDescription, DeclareLaunchArgument
+from launch.actions import GroupAction, IncludeLaunchDescription, DeclareLaunchArgument, TimerAction
 from launch.substitutions import LaunchConfiguration
 
 from launch_xml.launch_description_sources import XMLLaunchDescriptionSource
@@ -80,6 +80,22 @@ def generate_launch_description():
                 ),
                 launch_arguments=apm_launch_arguments.items()
         )
+    )
+
+    # Delay stream enforcer so MAVROS is fully connected
+    ld.add_action(
+        TimerAction(
+            period=5.0,
+            actions=[
+                Node(
+                    package='mrs_uav_apm_api',
+                    executable='mavros_stream_enforcer',
+                    namespace=uav_name,
+                    name='mavros_stream_enforcer',
+                    output='screen',
+                )
+            ]
+        )       
     )
 
     return ld
