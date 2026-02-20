@@ -139,7 +139,7 @@ def generate_launch_description():
 
                   ("~/mavros_cmd_out", "mavros/cmd/command"),
                   ("~/mavros_set_mode_out", "mavros/set_mode"),
-                  ("~/mavros_local_setpoint_out", "mavros/setpoint_raw/local"),
+                  ("~/mavros_position_setpoint_out", "mavros/setpoint_raw/local"),
                   ("~/mavros_attitude_setpoint_out", "mavros/setpoint_raw/attitude"),
                   ("~/mavros_actuator_control_out", "mavros/actuator_control"),
 
