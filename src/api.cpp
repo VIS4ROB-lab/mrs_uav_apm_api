@@ -630,8 +630,7 @@ bool MrsUavApmApi::callbackPositionCmd(
 /* callbackTrajectoryCmd() //{ */
 
 bool MrsUavApmApi::callbackTrajectoryCmd(
-    [[maybe_unused]] const mrs_msgs::msg::HwApiTrajectoryCmd::ConstSharedPtr
-        msg) {
+    const mrs_msgs::msg::HwApiTrajectoryCmd::ConstSharedPtr msg) {
   RCLCPP_INFO_ONCE(node_->get_logger(), "getting trajectory cmd");
 
   if (!_capabilities_.accepts_trajectory_cmd) {
@@ -642,8 +641,7 @@ bool MrsUavApmApi::callbackTrajectoryCmd(
 
   mavros_msgs::msg::PositionTarget position_target;
 
-  position_target.header.frame_id = "base_link";
-  position_target.header.stamp = msg->header.stamp;
+  position_target.header = msg->header;
 
   position_target.coordinate_frame =
       mavros_msgs::msg::PositionTarget::FRAME_BODY_NED;
