@@ -116,6 +116,7 @@ class AutoSetHome(Node):
         self.get_logger().info('Calling SET_HOME...')
         req = CommandHome.Request()
         req.current_gps = False
+        req.yaw = 0.0
         req.latitude = 0.0
         req.longitude = 0.0
         req.altitude = 0.0
