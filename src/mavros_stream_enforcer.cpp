@@ -20,6 +20,7 @@ static const std::vector<std::pair<uint32_t, double>> STREAMS = {
     {1, 10.0},     // SYS_STATUS
     {132, 100.0},  // DISTANCE_SENSOR
     {0, 100.0},    // HEARTBEAT
+    {245, 10.0},   // EXTENDED_SYS_STATE
 };
 
 class MavrosStreamEnforcer : public rclcpp::Node {
