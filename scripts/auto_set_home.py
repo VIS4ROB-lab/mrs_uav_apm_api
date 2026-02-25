@@ -1,38 +1,47 @@
 #!/usr/bin/env python3
 
+import math
 import rclpy
 from rclpy.node import Node
 
-from mavros_msgs.msg import State, ExtendedState
+from geometry_msgs.msg import PoseStamped
+from mavros_msgs.msg import State
 from mavros_msgs.srv import CommandHome
 
 
-class AutoSetHome(Node):
+class AutoSetHomePoseStability(Node):
     def __init__(self):
-        super().__init__('auto_set_home')
+        super().__init__('auto_set_home_pose_stability')
 
+        # --- Parameters ---
+        self.required_stable_samples = 10
+        self.max_delta_xy = 0.1  # meters
+        self.max_delta_z  = 0.1  # meters
+
+        # --- State ---
         self.connected = False
-        self.ekf_ok = False
-        self.on_ground = False
+        self.armed = False
         self.home_set = False
 
-        self.ekf_ok_count = 0
-        self.required_ekf_ok_count = 10  # ~0.5s at 20 Hz
+        self.last_pose = None
+        self.stable_count = 0
 
+        # --- Subscribers ---
         self.create_subscription(
             State,
             'mavros/state',
             self.state_cb,
-            10
+            1
         )
 
         self.create_subscription(
-            ExtendedState,
-            'mavros/extended_state',
-            self.extended_state_cb,
-            10
+            PoseStamped,
+            'mavros/local_position/pose',
+            self.pose_cb,
+            1
         )
 
+        # --- Service ---
         self.home_client = self.create_client(
             CommandHome,
             'mavros/cmd/set_home'
@@ -40,36 +49,45 @@ class AutoSetHome(Node):
 
         self.get_logger().info('Waiting for mavros/cmd/set_home service...')
         self.home_client.wait_for_service()
-        self.get_logger().info('AutoSetHome node started')
+        self.get_logger().info('Auto-set-home (pose stability) node started')
+
+    # ---------------- Callbacks ----------------
 
     def state_cb(self, msg: State):
         self.connected = msg.connected
+        self.armed = msg.armed
 
-    def extended_state_cb(self, msg: ExtendedState):
-        self.ekf_ok = msg.ekf_ok
-        self.on_ground = (
-            msg.landed_state == ExtendedState.LANDED_STATE_ON_GROUND
-        )
+    def pose_cb(self, msg: PoseStamped):
+        if self.home_set or not self.connected or self.armed:
+            return
 
-        if self.ekf_ok:
-            self.ekf_ok_count += 1
+        if self.last_pose is None:
+            self.last_pose = msg.pose.position
+            return
+
+        dx = msg.pose.position.x - self.last_pose.x
+        dy = msg.pose.position.y - self.last_pose.y
+        dz = msg.pose.position.z - self.last_pose.z
+
+        if (
+            abs(dx) <= self.max_delta_xy and
+            abs(dy) <= self.max_delta_xy and
+            abs(dz) <= self.max_delta_z
+        ):
+            self.stable_count += 1
         else:
-            self.ekf_ok_count = 0
+            self.stable_count = 0
 
-        if self.ready_to_set_home():
+        self.last_pose = msg.pose.position
+
+        if self.stable_count >= self.required_stable_samples:
             self.set_home()
 
-    def ready_to_set_home(self):
-        return (
-            self.connected and
-            self.on_ground and
-            not self.home_set and
-            self.ekf_ok_count >= self.required_ekf_ok_count
-        )
+    # ---------------- Home ----------------
 
     def set_home(self):
         self.get_logger().info(
-            'EKF stable + ON_GROUND → setting home position'
+            f'Pose stable for {self.stable_count} samples → setting home'
         )
 
         req = CommandHome.Request()
@@ -81,7 +99,7 @@ class AutoSetHome(Node):
         future = self.home_client.call_async(req)
         future.add_done_callback(self.home_response_cb)
 
-        # Prevent re-entry
+        # latch to prevent re-entry
         self.home_set = True
 
     def home_response_cb(self, future):
@@ -90,16 +108,21 @@ class AutoSetHome(Node):
             if resp.success:
                 self.get_logger().info('Home position set successfully')
             else:
-                self.get_logger().warn('Set home failed')
-                self.home_set = False
+                self.get_logger().warn('Set home failed — will retry')
+                self.reset()
         except Exception as e:
-            self.get_logger().error(f'Set home service call failed: {e}')
-            self.home_set = False
+            self.get_logger().error(f'Set home call failed: {e}')
+            self.reset()
+
+    def reset(self):
+        self.home_set = False
+        self.stable_count = 0
+        self.last_pose = None
 
 
 def main():
     rclpy.init()
-    node = AutoSetHome()
+    node = AutoSetHomePoseStability()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
