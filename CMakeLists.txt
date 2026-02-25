@@ -140,4 +140,9 @@ ament_export_dependencies(
   ${DEPENDENCIES}
 )
 
+file(GLOB_RECURSE script_files "scripts/*.py" "scripts/*.sh")
+install(PROGRAMS ${script_files}
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

@@ -100,18 +100,13 @@ def generate_launch_description():
 
     # Delay GP origin setter so MAVROS is fully connected and has a GPS fix (if available)
     ld.add_action(
-        TimerAction(
-            period=10.0,
-            actions=[
-                Node(
-                    package='mrs_uav_apm_api',
-                    executable='gp_origin_setter',
-                    namespace=uav_name,
-                    name='gp_origin_setter',
-                    output='screen',
-                )
-            ]
-        )       
+        Node(
+            package='mrs_uav_apm_api',
+            executable='auto_set_home.py',
+            namespace=uav_name,
+            name='auto_set_home',
+            output='screen',
+        )   
     )
 
     return ld
