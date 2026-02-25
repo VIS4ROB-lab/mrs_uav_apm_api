@@ -8,25 +8,27 @@ from mavros_msgs.msg import State
 from mavros_msgs.srv import CommandHome, SetMode
 
 
-class AutoSetHomeForceStabilize(Node):
+class AutoSetHome(Node):
     def __init__(self):
-        super().__init__('auto_set_home_force_stabilize')
+        super().__init__('auto_set_home')
 
         # -------- Parameters --------
         self.required_stable_samples = 100   # ~1–1.5 s
         self.max_delta_xy = 0.1            # meters
         self.max_delta_z  = 0.1            # meters
-        self.required_mode = 'STABILIZE'
+        self.stabilize_mode = 'STABILIZE'
+        self.post_home_mode = 'LOITER'
 
         # -------- State --------
         self.connected = False
         self.armed = False
         self.mode = ''
         self.home_set = False
+        self.waiting_for_mode = False
+        self.switching_to_loiter = False
 
         self.last_pose = None
         self.stable_count = 0
-        self.waiting_for_mode = False
 
         # -------- Subscribers --------
         self.create_subscription(State, 'mavros/state', self.state_cb, 1)
@@ -34,7 +36,7 @@ class AutoSetHomeForceStabilize(Node):
             PoseStamped,
             'mavros/local_position/pose',
             self.pose_cb,
-            10
+            1
         )
 
         # -------- Services --------
@@ -48,7 +50,7 @@ class AutoSetHomeForceStabilize(Node):
         self.get_logger().info('Waiting for MAVROS services...')
         self.set_home_client.wait_for_service()
         self.set_mode_client.wait_for_service()
-        self.get_logger().info('Auto-set-home (force STABILIZE) node started')
+        self.get_logger().info('Auto-set-home (STABILIZE → LOITER) node started')
 
     # ---------------- Callbacks ----------------
 
@@ -58,17 +60,18 @@ class AutoSetHomeForceStabilize(Node):
         self.mode = msg.mode
 
         # If we requested STABILIZE and it is now active, set home
-        if self.waiting_for_mode and self.mode == self.required_mode:
+        if self.waiting_for_mode and self.mode == self.stabilize_mode:
             self.get_logger().info('STABILIZE confirmed → setting home')
             self.waiting_for_mode = False
             self.call_set_home()
 
+        # If we are switching to LOITER, confirm it
+        if self.switching_to_loiter and self.mode == self.post_home_mode:
+            self.get_logger().info(f'{self.post_home_mode} confirmed. Auto-home sequence complete')
+            self.switching_to_loiter = False
+
     def pose_cb(self, msg: PoseStamped):
-        if (
-            self.home_set or
-            not self.connected or
-            self.armed
-        ):
+        if self.home_set or not self.connected or self.armed:
             return
 
         if self.last_pose is None:
@@ -96,12 +99,10 @@ class AutoSetHomeForceStabilize(Node):
     # ---------------- Logic ----------------
 
     def trigger_home_sequence(self):
-        if self.mode != self.required_mode:
-            self.get_logger().info(
-                f'Pose stable → switching to {self.required_mode}'
-            )
+        if self.mode != self.stabilize_mode:
+            self.get_logger().info(f'Pose stable → switching to {self.stabilize_mode}')
             self.waiting_for_mode = True
-            self.call_set_mode(self.required_mode)
+            self.call_set_mode(self.stabilize_mode)
         else:
             self.call_set_home()
 
@@ -122,7 +123,6 @@ class AutoSetHomeForceStabilize(Node):
         future = self.set_home_client.call_async(req)
         future.add_done_callback(self.home_response_cb)
 
-        # Latch to prevent re-entry
         self.home_set = True
 
     def home_response_cb(self, future):
@@ -130,10 +130,12 @@ class AutoSetHomeForceStabilize(Node):
             resp = future.result()
             if resp.success:
                 self.get_logger().info('Home position set successfully')
+                # Now switch to LOITER
+                self.get_logger().info(f'Switching to {self.post_home_mode}')
+                self.switching_to_loiter = True
+                self.call_set_mode(self.post_home_mode)
             else:
-                self.get_logger().warn(
-                    f'SET_HOME failed (result={resp.result}), will retry'
-                )
+                self.get_logger().warn(f'SET_HOME failed (result={resp.result}), will retry')
                 self.reset()
         except Exception as e:
             self.get_logger().error(f'SET_HOME service call failed: {e}')
@@ -142,13 +144,14 @@ class AutoSetHomeForceStabilize(Node):
     def reset(self):
         self.home_set = False
         self.waiting_for_mode = False
+        self.switching_to_loiter = False
         self.stable_count = 0
         self.last_pose = None
 
 
 def main():
     rclpy.init()
-    node = AutoSetHomeForceStabilize()
+    node = AutoSetHome()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
