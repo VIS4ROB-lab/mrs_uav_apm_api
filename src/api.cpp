@@ -13,18 +13,21 @@
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
+#include <mrs_lib/service_server_handler.h>
 #include <mrs_lib/subscriber_handler.h>
 
 #include <geometry_msgs/msg/quaternion_stamped.hpp>
 #include <mavros_msgs/msg/actuator_control.hpp>
 #include <mavros_msgs/msg/altitude.hpp>
 #include <mavros_msgs/msg/attitude_target.hpp>
+#include <mavros_msgs/msg/extended_state.hpp>
 #include <mavros_msgs/msg/gpsraw.hpp>
 #include <mavros_msgs/msg/position_target.hpp>
 #include <mavros_msgs/msg/rc_in.hpp>
 #include <mavros_msgs/msg/state.hpp>
 #include <mavros_msgs/srv/command_long.hpp>
 #include <mavros_msgs/srv/set_mode.hpp>
+#include <mrs_msgs/srv/vec1.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <std_msgs/msg/float64.hpp>
 
@@ -102,6 +105,9 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
 
   // | -------------------- service callbacks ------------------- |
 
+  bool callbackTakeoff(
+      const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request,
+      const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
   std::tuple<bool, std::string> callbackArming(const bool& request);
   std::tuple<bool, std::string> callbackOffboard(void);
 
@@ -131,6 +137,10 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
   std::string _sim_rtk_utm_zone_;
   double _sim_rtk_amsl_;
 
+  // | --------------------- service servers -------------------- |
+
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec1> ss_takeoff_;
+
   // | --------------------- service clients -------------------- |
 
   mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandLong>
@@ -141,6 +151,8 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
 
   mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry> sh_ground_truth_;
   mrs_lib::SubscriberHandler<mavros_msgs::msg::State> sh_mavros_state_;
+  mrs_lib::SubscriberHandler<mavros_msgs::msg::ExtendedState>
+      sh_mavros_extended_state_;
   mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry> sh_mavros_odometry_local_;
   mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry> sh_mavros_odometry_in_;
   mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix> sh_mavros_gps_;
@@ -159,6 +171,8 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
 
   void callbackGroundTruth(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
   void callbackMavrosState(const mavros_msgs::msg::State::ConstSharedPtr msg);
+  void callbackMavrosExtendedState(
+      const mavros_msgs::msg::ExtendedState::ConstSharedPtr msg);
   void callbackOdometryLocal(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
   void callbackOdometryIn(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
   void callbackNavsatFix(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
@@ -197,6 +211,7 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
 
   // | ------------------------ variables ----------------------- |
 
+  uint8_t landed_state_ = 0;
   std::atomic<bool> offboard_ = false;
   std::string mode_;
   std::atomic<bool> armed_ = false;
@@ -309,6 +324,14 @@ void MrsUavApmApi::initialize(
     rclcpp::shutdown();
   }
 
+  // | --------------------- service servers -------------------- |
+
+  ss_takeoff_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec1>(
+      node_, "~/takeoff",
+      std::bind(&MrsUavApmApi::callbackTakeoff, this, std::placeholders::_1,
+                std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), callback_group_);
+
   // | --------------------- service clients -------------------- |
 
   sch_mavros_command_long_ =
@@ -344,6 +367,11 @@ void MrsUavApmApi::initialize(
 
   sh_mavros_state_ = mrs_lib::SubscriberHandler<mavros_msgs::msg::State>(
       shopts, "~/mavros_state_in", &MrsUavApmApi::callbackMavrosState, this);
+
+  sh_mavros_extended_state_ =
+      mrs_lib::SubscriberHandler<mavros_msgs::msg::ExtendedState>(
+          shopts, "~/mavros_extended_state_in",
+          &MrsUavApmApi::callbackMavrosExtendedState, this);
 
   sh_mavros_odometry_local_ =
       mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(
@@ -676,6 +704,65 @@ void MrsUavApmApi::callbackTrackerCmd(
 
 //}
 
+/* //{ callbackTakeoff() */
+
+bool MrsUavApmApi::callbackTakeoff(
+    [[maybe_unused]] const std::shared_ptr<mrs_msgs::srv::Vec1::Request>
+        request,
+    const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
+  std::stringstream ss;
+
+  auto srv_out = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
+
+  srv_out->broadcast = false;
+  srv_out->command = 22;  // the code for takeoff
+  srv_out->confirmation = true;
+
+  srv_out->param1 = 0;
+  srv_out->param2 = 0;
+  srv_out->param3 = 0;
+  srv_out->param4 = 0;
+  srv_out->param5 = 0;
+  srv_out->param6 = 0;
+  srv_out->param7 = request->goal;  // the takeoff altitude
+
+  RCLCPP_INFO(node_->get_logger(), "calling for takeoff");
+
+  bool success = false;
+
+  auto mavros_response = sch_mavros_command_long_.callSync(srv_out);
+
+  if (mavros_response) {
+    success = mavros_response.value()->success;
+
+    if (success) {
+      ss << "service call for takeoff was successful";
+      RCLCPP_INFO_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
+                                  "" << ss.str());
+      while (landed_state_ == 1 || landed_state_ == 3) {
+        RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000,
+                             "waiting for takeoff to finish...");
+        rclcpp::sleep_for(std::chrono::milliseconds(100));
+      }
+    } else {
+      ss << "service call for takeoff failed";
+      RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
+                                   "" << ss.str());
+    }
+
+  } else {
+    ss << "failed to call Mavros CommandLong service";
+    RCLCPP_ERROR(node_->get_logger(), "%s", ss.str().c_str());
+  }
+
+  response->message = ss.str();
+  response->success = success;
+
+  return true;
+}
+
+//}
+
 /* callbackArming() //{ */
 
 std::tuple<bool, std::string> MrsUavApmApi::callbackArming(
@@ -891,6 +978,20 @@ void MrsUavApmApi::callbackMavrosState(
                        last_mavros_state_time_);
 
   common_handlers_->publishers.publishStatus(status);
+}
+
+//}
+
+/* //{ callbackMavrosExtendedState() */
+
+void MrsUavApmApi::callbackMavrosExtendedState(
+    const mavros_msgs::msg::ExtendedState::ConstSharedPtr msg) {
+  if (!is_initialized_) {
+    return;
+  }
+
+  RCLCPP_INFO_ONCE(node_->get_logger(), "getting Mavros extended state");
+  landed_state_ = msg->landed_state;
 }
 
 //}
