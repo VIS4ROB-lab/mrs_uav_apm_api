@@ -13,6 +13,7 @@ static constexpr uint16_t MAV_CMD_SET_MESSAGE_INTERVAL = 511;
 static const std::vector<std::pair<uint32_t, double>> STREAMS = {
     {27, 100.0},  // RAW_IMU
     {65, 10.0},   // RC_CHANNELS
+    {30, 100.0},  // ATTITUDE
     {32, 100.0},  // LOCAL_POSITION_NED
     {33, 1.0},    // GLOBAL_POSITION_INT
     {1, 10.0},    // SYS_STATUS
