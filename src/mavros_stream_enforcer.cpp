@@ -11,16 +11,19 @@ static constexpr uint16_t MAV_CMD_SET_MESSAGE_INTERVAL = 511;
 
 // (message_id, rate_hz)
 static const std::vector<std::pair<uint32_t, double>> STREAMS = {
+    {0, 100.0},   // HEARTBEAT
+    {1, 10.0},    // SYS_STATUS
     {27, 100.0},  // RAW_IMU
-    {65, 10.0},   // RC_CHANNELS
     {30, 100.0},  // ATTITUDE
     {32, 100.0},  // LOCAL_POSITION_NED
-    {33, 1.0},    // GLOBAL_POSITION_INT
-    {1, 10.0},    // SYS_STATUS
-    {0, 100.0},   // HEARTBEAT
+    {33, 10.0},   // GLOBAL_POSITION_INT
+    {65, 10.0},   // RC_CHANNELS
+    {147, 10.0},  // BATTERY_STATUS
+    {148, 10.0},  // AUTOPILOT_VERSION
+    {152, 10.0},  // MEM_INFO
+    {165, 10.0},  // HWSTATUS
     {245, 10.0},  // EXTENDED_SYS_STATE
-    {48, 1.0},    // GPS_GLOBAL_ORIGIN
-    {242, 1.0},   // HOME_POSITION
+    {253, 10.0},  // STATUS_TEXT
 };
 
 class MavrosStreamEnforcer : public rclcpp::Node {
