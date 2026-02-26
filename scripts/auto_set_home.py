@@ -146,7 +146,7 @@ class AutoSetHome(Node):
         msg.position.latitude = self.gps_latitude
         msg.position.longitude = self.gps_longitude
         msg.position.altitude = self.gps_altitude
-        self.ekf_origin_pub.publish(msg)
+        # self.ekf_origin_pub.publish(msg)
         self.ekf_origin_set = True
         self.get_logger().info(
             f'EKF origin published successfully: lat={self.gps_latitude:.8f}, '
