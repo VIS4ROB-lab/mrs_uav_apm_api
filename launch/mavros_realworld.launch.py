@@ -102,9 +102,9 @@ def generate_launch_description():
     ld.add_action(
         Node(
             package='mrs_uav_apm_api',
-            executable='auto_set_home.py',
+            executable='gp_origin_setter',
             namespace=uav_name,
-            name='auto_set_home',
+            name='gp_origin_setter',
             output='screen',
         )   
     )
