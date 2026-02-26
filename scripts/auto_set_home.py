@@ -30,7 +30,8 @@ class AutoSetHome(Node):
 
         self.ekf_origin_set = False
         self.waiting_for_stabilize = False
-        self.home_set = False
+        self.home_set = False  # True when we have published home position
+        self.home_confirmed = False  # True when mavros/home_position/home confirms
         self.switching_to_loiter = False
         self.gps_fix_received = False
         self.gps_latitude = 0.0
@@ -55,12 +56,14 @@ class AutoSetHome(Node):
 
     # ---------------- Callbacks ----------------
     def home_position_cb(self, msg: HomePosition):
-            if not self.home_set:
-                self.get_logger().info('Home position confirmed from mavros/home_position/home')
+        if not self.home_confirmed:
+            self.get_logger().info('Home position confirmed from mavros/home_position/home')
+            self.home_confirmed = True
+            # Optionally, switch to LOITER here if not already done
+            if not self.switching_to_loiter:
                 self.get_logger().info('Switching to LOITER')
                 self.switching_to_loiter = True
                 self.call_set_mode(self.post_home_mode)
-                self.home_set = True
     def gp_origin_cb(self, msg: GeoPointStamped):
         if not self.ekf_origin_set:
             self.ekf_origin_set = True
@@ -172,7 +175,9 @@ class AutoSetHome(Node):
         msg.approach.x = 0.0
         msg.approach.y = 0.0
         msg.approach.z = 1.0
+        self.home_confirmed = False  # Reset confirmation flag before publishing new home
         self.home_position_pub.publish(msg)
+        self.home_set = True
         self.get_logger().info(
             f'HomePosition published: lat={self.gps_latitude:.8f}, '
             f'lon={self.gps_longitude:.8f}, alt={self.gps_altitude:.3f}'
@@ -184,8 +189,9 @@ def main():
     try:
         while rclpy.ok():
             rclpy.spin_once(node, timeout_sec=0.1)
-            if node.home_set:
-                node.get_logger().info('Home position set, exiting node.')
+            # Only exit after home position has been published and confirmed by mavros/home_position/home
+            if node.home_set and node.home_confirmed:
+                node.get_logger().info('Home position published and confirmed, exiting node.')
                 break
     finally:
         node.destroy_node()
