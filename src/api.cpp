@@ -645,11 +645,7 @@ bool MrsUavApmApi::callbackTrajectoryCmd(
 
   position_target.coordinate_frame =
       mavros_msgs::msg::PositionTarget::FRAME_LOCAL_NED;
-  position_target.type_mask =
-      position_target.IGNORE_VX | position_target.IGNORE_VY |
-      position_target.IGNORE_VZ | position_target.IGNORE_AFX |
-      position_target.IGNORE_AFY | position_target.IGNORE_AFZ |
-      position_target.IGNORE_YAW_RATE;
+  position_target.type_mask = 0;
 
   position_target.position.x = msg->position.x;
   position_target.position.y = msg->position.y;
