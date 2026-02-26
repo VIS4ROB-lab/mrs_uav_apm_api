@@ -11,15 +11,15 @@ static constexpr uint16_t MAV_CMD_SET_MESSAGE_INTERVAL = 511;
 
 // (message_id, rate_hz)
 static const std::vector<std::pair<uint32_t, double>> STREAMS = {
-    // {30, 100.0},   // ATTITUDE
-    // {83, 100.0},   // ATTITUDE_TARGET
     {27, 100.0},  // RAW_IMU
     {65, 10.0},   // RC_CHANNELS
     {32, 100.0},  // LOCAL_POSITION_NED
-    // {33, 100.0},  // GLOBAL_POSITION_INT
-    {1, 10.0},  // SYS_STATUS
-    // {132, 100.0},  // DISTANCE_SENSOR
-    {0, 100.0},  // HEARTBEAT
+    {33, 1.0},    // GLOBAL_POSITION_INT
+    {1, 10.0},    // SYS_STATUS
+    {0, 100.0},   // HEARTBEAT
+    {245, 10.0},  // EXTENDED_SYS_STATE
+    {48, 1.0},    // GPS_GLOBAL_ORIGIN
+    {242, 1.0},   // HOME_POSITION
 };
 
 class MavrosStreamEnforcer : public rclcpp::Node {
@@ -29,18 +29,24 @@ class MavrosStreamEnforcer : public rclcpp::Node {
         "mavros/cmd/command");
 
     timer_ = this->create_wall_timer(
-        5s, std::bind(&MavrosStreamEnforcer::enforce_streams, this));
+        500ms, std::bind(&MavrosStreamEnforcer::try_enforce_once, this));
 
-    RCLCPP_INFO(get_logger(),
-                "MAVROS stream enforcer started (reassert every 5s)");
+    RCLCPP_INFO(get_logger(), "MAVROS stream enforcer started (one-shot)");
   }
 
  private:
-  void enforce_streams() {
+  void try_enforce_once() {
+    if (enforce_streams()) {
+      timer_->cancel();
+      RCLCPP_INFO(get_logger(), "MAVROS streams enforced once, timer stopped");
+    }
+  }
+
+  bool enforce_streams() {
     if (!client_->service_is_ready()) {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
                            "Waiting for mavros/cmd/command...");
-      return;
+      return false;
     }
 
     for (const auto& s : STREAMS) {
@@ -57,6 +63,8 @@ class MavrosStreamEnforcer : public rclcpp::Node {
 
       client_->async_send_request(req);
     }
+
+    return true;
   }
 
   rclcpp::Client<mavros_msgs::srv::CommandLong>::SharedPtr client_;

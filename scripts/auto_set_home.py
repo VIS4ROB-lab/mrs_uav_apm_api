@@ -3,8 +3,10 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from geographic_msgs.msg import GeoPointStamped
+from sensor_msgs.msg import NavSatFix
 from mavros_msgs.msg import State
-from mavros_msgs.srv import CommandHome, SetMode
+from mavros_msgs.msg import HomePosition
+from mavros_msgs.srv import SetMode
 
 class AutoSetHome(Node):
     def __init__(self):
@@ -23,23 +25,28 @@ class AutoSetHome(Node):
         self.mode = ''
         self.pose_stable_count = 0
         self.last_pose = None
+        self.last_orientation = None
 
         self.ekf_origin_set = False
         self.waiting_for_stabilize = False
         self.home_set = False
         self.switching_to_loiter = False
+        self.gps_fix_received = False
+        self.gps_latitude = 0.0
+        self.gps_longitude = 0.0
+        self.gps_altitude = 0.0
 
         # -------- Subscribers --------
         self.create_subscription(State, 'mavros/state', self.state_cb, 1)
         self.create_subscription(PoseStamped, 'mavros/local_position/pose', self.pose_cb, 1)
+        self.create_subscription(NavSatFix, 'mavros/global_position/global', self.gps_cb, 1)
 
         # -------- Publishers / Services --------
         self.ekf_origin_pub = self.create_publisher(GeoPointStamped, 'mavros/global_position/set_gp_origin', 1)
-        self.set_home_client = self.create_client(CommandHome, 'mavros/cmd/set_home')
+        self.home_position_pub = self.create_publisher(HomePosition, 'mavros/home_position/set', 1)
         self.set_mode_client = self.create_client(SetMode, 'mavros/set_mode')
 
         self.get_logger().info('Waiting for MAVROS services...')
-        self.set_home_client.wait_for_service()
         self.set_mode_client.wait_for_service()
         self.get_logger().info('Auto-set-home node started')
 
@@ -53,7 +60,8 @@ class AutoSetHome(Node):
         if self.waiting_for_stabilize and self.mode == self.stabilize_mode:
             self.get_logger().info('STABILIZE confirmed → setting home')
             self.waiting_for_stabilize = False
-            self.call_set_home()
+            if self.last_pose is not None and self.last_orientation is not None:
+                self.publish_home_position()
 
         # LOITER confirmation
         if self.switching_to_loiter and self.mode == self.post_home_mode:
@@ -67,6 +75,7 @@ class AutoSetHome(Node):
         # Compute deltas for stability
         if self.last_pose is None:
             self.last_pose = msg.pose.position
+            self.last_orientation = msg.pose.orientation
             return
 
         dx = msg.pose.position.x - self.last_pose.x
@@ -79,12 +88,27 @@ class AutoSetHome(Node):
             self.pose_stable_count = 0
 
         self.last_pose = msg.pose.position
+        self.last_orientation = msg.pose.orientation
 
         if self.pose_stable_count >= self.stable_samples_required:
             self.trigger_home_sequence()
 
+    def gps_cb(self, msg: NavSatFix):
+        self.gps_latitude = msg.latitude
+        self.gps_longitude = msg.longitude
+        self.gps_altitude = msg.altitude
+        if not self.gps_fix_received:
+            self.gps_fix_received = True
+            self.get_logger().info(
+                f'GPS fix received: lat={self.gps_latitude:.8f}, '
+                f'lon={self.gps_longitude:.8f}, alt={self.gps_altitude:.3f}'
+            )
+
     # ---------------- Logic ----------------
     def trigger_home_sequence(self):
+        if not self.gps_fix_received or self.last_pose is None or self.last_orientation is None:
+            return
+
         if not self.ekf_origin_set:
             self.set_ekf_origin()
         elif self.mode != self.stabilize_mode:
@@ -92,19 +116,22 @@ class AutoSetHome(Node):
             self.waiting_for_stabilize = True
             self.call_set_mode(self.stabilize_mode)
         elif not self.home_set:
-            self.call_set_home()
+            self.publish_home_position()
 
     # -------- EKF origin --------
     def set_ekf_origin(self):
         self.get_logger().info('Publishing EKF origin (GeoPointStamped)...')
         msg = GeoPointStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.position.latitude = 0.0    # Can be 0 for local external nav
-        msg.position.longitude = 0.0   # Can be 0 for local external nav
-        msg.position.altitude = 0.0    # Relative altitude
+        msg.position.latitude = self.gps_latitude
+        msg.position.longitude = self.gps_longitude
+        msg.position.altitude = self.gps_altitude
         self.ekf_origin_pub.publish(msg)
         self.ekf_origin_set = True
-        self.get_logger().info('EKF origin published successfully')
+        self.get_logger().info(
+            f'EKF origin published successfully: lat={self.gps_latitude:.8f}, '
+            f'lon={self.gps_longitude:.8f}, alt={self.gps_altitude:.3f}'
+        )
 
     # -------- Service calls --------
     def call_set_mode(self, mode: str):
@@ -112,31 +139,32 @@ class AutoSetHome(Node):
         req.custom_mode = mode
         self.set_mode_client.call_async(req)
 
-    def call_set_home(self):
-        self.get_logger().info('Calling SET_HOME...')
-        req = CommandHome.Request()
-        req.current_gps = False
-        req.yaw = 0.0
-        req.latitude = 0.0
-        req.longitude = 0.0
-        req.altitude = 0.0
-        future = self.set_home_client.call_async(req)
-        future.add_done_callback(self.home_response)
+    def publish_home_position(self):
+        self.get_logger().info('Publishing HomePosition to mavros/home_position/set...')
+        msg = HomePosition()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.geo.latitude = self.gps_latitude
+        msg.geo.longitude = self.gps_longitude
+        msg.geo.altitude = self.gps_altitude
+        msg.position.x = self.last_pose.x
+        msg.position.y = self.last_pose.y
+        msg.position.z = self.last_pose.z
+        msg.orientation.x = self.last_orientation.x
+        msg.orientation.y = self.last_orientation.y
+        msg.orientation.z = self.last_orientation.z
+        msg.orientation.w = self.last_orientation.w
+        msg.approach.x = 0.0
+        msg.approach.y = 0.0
+        msg.approach.z = 1.0
+        self.home_position_pub.publish(msg)
         self.home_set = True
-
-    def home_response(self, future):
-        try:
-            resp = future.result()
-            if resp.success:
-                self.get_logger().info('Home set successfully → switching to LOITER')
-                self.switching_to_loiter = True
-                self.call_set_mode(self.post_home_mode)
-            else:
-                self.get_logger().warn(f'SET_HOME failed (result={resp.result}), retrying')
-                self.pose_stable_count = 0  # retry after more stable poses
-        except Exception as e:
-            self.get_logger().error(f'SET_HOME service call failed: {e}')
-            self.pose_stable_count = 0
+        self.get_logger().info(
+            f'HomePosition published: lat={self.gps_latitude:.8f}, '
+            f'lon={self.gps_longitude:.8f}, alt={self.gps_altitude:.3f}'
+        )
+        self.get_logger().info('Switching to LOITER')
+        self.switching_to_loiter = True
+        self.call_set_mode(self.post_home_mode)
 
 def main():
     rclpy.init()
