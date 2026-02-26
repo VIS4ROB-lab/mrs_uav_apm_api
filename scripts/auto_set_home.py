@@ -56,7 +56,7 @@ class AutoSetHome(Node):
 
     # ---------------- Callbacks ----------------
     def home_position_cb(self, msg: HomePosition):
-        if not self.home_confirmed:
+        if not self.home_confirmed and self.home_set:
             self.get_logger().info('Home position confirmed from mavros/home_position/home')
             self.home_confirmed = True
             # Optionally, switch to LOITER here if not already done
@@ -147,6 +147,7 @@ class AutoSetHome(Node):
         msg.position.longitude = self.gps_longitude
         msg.position.altitude = self.gps_altitude
         self.ekf_origin_pub.publish(msg)
+        self.ekf_origin_set = True
         self.get_logger().info(
             f'EKF origin published successfully: lat={self.gps_latitude:.8f}, '
             f'lon={self.gps_longitude:.8f}, alt={self.gps_altitude:.3f}'
