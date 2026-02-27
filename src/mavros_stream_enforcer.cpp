@@ -19,11 +19,9 @@ static const std::vector<std::pair<uint32_t, double>> STREAMS = {
     {33, 10.0},   // GLOBAL_POSITION_INT
     {65, 10.0},   // RC_CHANNELS
     {147, 10.0},  // BATTERY_STATUS
-    {148, 10.0},  // AUTOPILOT_VERSION
     {152, 10.0},  // MEM_INFO
     {165, 10.0},  // HWSTATUS
     {245, 10.0},  // EXTENDED_SYS_STATE
-    {253, 10.0},  // STATUS_TEXT
 };
 
 class MavrosStreamEnforcer : public rclcpp::Node {
