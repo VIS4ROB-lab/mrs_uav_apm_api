@@ -25,11 +25,13 @@
 #include <mavros_msgs/msg/position_target.hpp>
 #include <mavros_msgs/msg/rc_in.hpp>
 #include <mavros_msgs/msg/state.hpp>
-#include <mavros_msgs/srv/command_long.hpp>
+#include <mavros_msgs/srv/command_bool.hpp>
+#include <mavros_msgs/srv/command_tol.hpp>
 #include <mavros_msgs/srv/set_mode.hpp>
 #include <mrs_msgs/srv/vec1.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <std_msgs/msg/float64.hpp>
+#include <std_msgs/msg/u_int8.hpp>
 
 //}
 
@@ -143,8 +145,10 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
 
   // | --------------------- service clients -------------------- |
 
-  mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandLong>
-      sch_mavros_command_long_;
+  mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandBool>
+      sch_mavros_arming_;
+  mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandTOL>
+      sch_mavros_takeoff_;
   mrs_lib::ServiceClientHandler<mavros_msgs::srv::SetMode> sch_mavros_mode_;
 
   // | ----------------------- subscribers ---------------------- |
@@ -202,6 +206,7 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
       ph_mavros_actuator_control_;
   mrs_lib::PublisherHandler<mavros_msgs::msg::PositionTarget>
       ph_mavros_position_target_;
+  mrs_lib::PublisherHandler<std_msgs::msg::UInt8> ph_landed_state_;
 
   // | ------------------------- timers ------------------------- |
 
@@ -211,7 +216,6 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
 
   // | ------------------------ variables ----------------------- |
 
-  uint8_t landed_state_ = 0;
   std::atomic<bool> offboard_ = false;
   std::string mode_;
   std::atomic<bool> armed_ = false;
@@ -334,9 +338,12 @@ void MrsUavApmApi::initialize(
 
   // | --------------------- service clients -------------------- |
 
-  sch_mavros_command_long_ =
-      mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandLong>(
-          node_, "~/mavros_cmd_out", callback_group_);
+  sch_mavros_arming_ =
+      mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandBool>(
+          node_, "~/mavros_arming_out", callback_group_);
+  sch_mavros_takeoff_ =
+      mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandTOL>(
+          node_, "~/mavros_takeoff_out", callback_group_);
   sch_mavros_mode_ = mrs_lib::ServiceClientHandler<mavros_msgs::srv::SetMode>(
       node_, "~/mavros_set_mode_out", callback_group_);
 
@@ -428,6 +435,8 @@ void MrsUavApmApi::initialize(
   ph_mavros_position_target_ =
       mrs_lib::PublisherHandler<mavros_msgs::msg::PositionTarget>(
           node_, "~/mavros_position_setpoint_out");
+  ph_landed_state_ =
+      mrs_lib::PublisherHandler<std_msgs::msg::UInt8>(node_, "~/landed_state");
 
   // | ----------------------- finish init ---------------------- |
 
@@ -707,30 +716,23 @@ void MrsUavApmApi::callbackTrackerCmd(
 /* //{ callbackTakeoff() */
 
 bool MrsUavApmApi::callbackTakeoff(
-    [[maybe_unused]] const std::shared_ptr<mrs_msgs::srv::Vec1::Request>
-        request,
+    const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request,
     const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
   std::stringstream ss;
 
-  auto srv_out = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
+  auto srv_out = std::make_shared<mavros_msgs::srv::CommandTOL::Request>();
 
-  srv_out->broadcast = false;
-  srv_out->command = 22;  // the code for takeoff
-  srv_out->confirmation = true;
-
-  srv_out->param1 = 0;
-  srv_out->param2 = 0;
-  srv_out->param3 = 0;
-  srv_out->param4 = 0;
-  srv_out->param5 = 0;
-  srv_out->param6 = 0;
-  srv_out->param7 = request->goal;  // the takeoff altitude
+  srv_out->min_pitch = 0.0;
+  srv_out->yaw = 0.0;
+  srv_out->latitude = 0.0;
+  srv_out->longitude = 0.0;
+  srv_out->altitude = request->goal;
 
   RCLCPP_INFO(node_->get_logger(), "calling for takeoff");
 
   bool success = false;
 
-  auto mavros_response = sch_mavros_command_long_.callSync(srv_out);
+  auto mavros_response = sch_mavros_takeoff_.callSync(srv_out);
 
   if (mavros_response) {
     success = mavros_response.value()->success;
@@ -739,11 +741,6 @@ bool MrsUavApmApi::callbackTakeoff(
       ss << "service call for takeoff was successful";
       RCLCPP_INFO_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
                                   "" << ss.str());
-      while (landed_state_ == 1 || landed_state_ == 3) {
-        RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000,
-                             "waiting for takeoff to finish...");
-        rclcpp::sleep_for(std::chrono::milliseconds(100));
-      }
     } else {
       ss << "service call for takeoff failed";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
@@ -751,7 +748,7 @@ bool MrsUavApmApi::callbackTakeoff(
     }
 
   } else {
-    ss << "failed to call Mavros CommandLong service";
+    ss << "failed to call Mavros CommandTOL service";
     RCLCPP_ERROR(node_->get_logger(), "%s", ss.str().c_str());
   }
 
@@ -766,41 +763,19 @@ bool MrsUavApmApi::callbackTakeoff(
 /* callbackArming() //{ */
 
 std::tuple<bool, std::string> MrsUavApmApi::callbackArming(
-    [[maybe_unused]] const bool& request) {
+    const bool& request) {
   std::stringstream ss;
 
-  auto srv_out = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
+  auto srv_out = std::make_shared<mavros_msgs::srv::CommandBool::Request>();
 
-  // when REALWORLD AND ARM:=TRUE
-  // if (!_simulation_ && request) {
-  //   ss << "can not arm by service when not in simulation! You should arm the
-  //   "
-  //         "drone by the RC controller only!";
-  //   RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
-  //                                "" << ss.str());
-
-  //   return {false, ss.str()};
-  // }
-
-  srv_out->broadcast = false;
-  srv_out->command = 400;  // the code for arming
-  srv_out->confirmation = true;
-
-  srv_out->param1 = request ? 1 : 0;  // arm or disarm?
-  srv_out->param2 =
-      request ? 0 : 21196;  // 21196 allows to disarm even in mid-flight
-  srv_out->param3 = 0;
-  srv_out->param4 = 0;
-  srv_out->param5 = 0;
-  srv_out->param6 = 0;
-  srv_out->param7 = 0;
+  srv_out->value = request;
 
   RCLCPP_INFO(node_->get_logger(), "calling for %s",
               request ? "arming" : "disarming");
 
   bool success = false;
 
-  auto response = sch_mavros_command_long_.callSync(srv_out);
+  auto response = sch_mavros_arming_.callSync(srv_out);
 
   if (response) {
     success = response.value()->success;
@@ -819,7 +794,7 @@ std::tuple<bool, std::string> MrsUavApmApi::callbackArming(
     }
 
   } else {
-    ss << "failed to call Mavros CommandLong service";
+    ss << "failed to call Mavros CommandBool service";
     RCLCPP_ERROR(node_->get_logger(), "%s", ss.str().c_str());
   }
 
@@ -991,7 +966,10 @@ void MrsUavApmApi::callbackMavrosExtendedState(
   }
 
   RCLCPP_INFO_ONCE(node_->get_logger(), "getting Mavros extended state");
-  landed_state_ = msg->landed_state;
+
+  std_msgs::msg::UInt8 landed_state_msg;
+  landed_state_msg.data = msg->landed_state;
+  ph_landed_state_.publish(landed_state_msg);
 }
 
 //}
