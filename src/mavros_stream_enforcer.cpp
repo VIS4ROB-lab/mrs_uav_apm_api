@@ -18,6 +18,7 @@ static const std::vector<std::pair<uint32_t, double>> STREAMS = {
     {32, 100.0},  // LOCAL_POSITION_NED
     {33, 10.0},   // GLOBAL_POSITION_INT
     {65, 10.0},   // RC_CHANNELS
+    {83, 10.0},   // ATTITUDE_TARGET
     {147, 10.0},  // BATTERY_STATUS
     {152, 10.0},  // MEM_INFO
     {165, 10.0},  // HWSTATUS
