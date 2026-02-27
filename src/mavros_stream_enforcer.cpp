@@ -32,46 +32,64 @@ class MavrosStreamEnforcer : public rclcpp::Node {
         "mavros/cmd/command");
 
     timer_ = this->create_wall_timer(
-        500ms, std::bind(&MavrosStreamEnforcer::try_enforce_once, this));
+        100ms, std::bind(&MavrosStreamEnforcer::enforce_tick, this));
 
-    RCLCPP_INFO(get_logger(), "MAVROS stream enforcer started (one-shot)");
+    RCLCPP_INFO(get_logger(),
+                "MAVROS stream enforcer started (serialized requests)");
   }
 
  private:
-  void try_enforce_once() {
-    if (enforce_streams()) {
-      timer_->cancel();
-      RCLCPP_INFO(get_logger(), "MAVROS streams enforced once, timer stopped");
-    }
-  }
-
-  bool enforce_streams() {
+  void enforce_tick() {
     if (!client_->service_is_ready()) {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
                            "Waiting for mavros/cmd/command...");
-      return false;
+      return;
     }
 
-    for (const auto& s : STREAMS) {
-      auto req = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
-
-      req->command = MAV_CMD_SET_MESSAGE_INTERVAL;
-      req->param1 = static_cast<float>(s.first);
-      req->param2 = static_cast<float>(1e6 / s.second);
-      req->param3 = 0.0f;
-      req->param4 = 0.0f;
-      req->param5 = 0.0f;
-      req->param6 = 0.0f;
-      req->param7 = 0.0f;
-
-      client_->async_send_request(req);
+    if (next_stream_idx_ >= STREAMS.size()) {
+      timer_->cancel();
+      RCLCPP_INFO(get_logger(), "MAVROS streams enforced, timer stopped");
+      return;
     }
 
-    return true;
+    if (request_in_flight_) {
+      return;
+    }
+
+    const auto& stream = STREAMS[next_stream_idx_];
+    auto req = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
+
+    req->command = MAV_CMD_SET_MESSAGE_INTERVAL;
+    req->param1 = static_cast<float>(stream.first);
+    req->param2 = static_cast<float>(1e6 / stream.second);
+    req->param3 = 0.0f;
+    req->param4 = 0.0f;
+    req->param5 = 0.0f;
+    req->param6 = 0.0f;
+    req->param7 = 0.0f;
+
+    request_in_flight_ = true;
+    client_->async_send_request(
+        req, [this, stream](
+                 rclcpp::Client<mavros_msgs::srv::CommandLong>::SharedFuture
+                     future) {
+          request_in_flight_ = false;
+
+          const auto& res = future.get();
+          if (!res->success) {
+            RCLCPP_WARN(get_logger(),
+                        "Failed to set MAVLink message interval for msg id %u",
+                        stream.first);
+          }
+
+          ++next_stream_idx_;
+        });
   }
 
   rclcpp::Client<mavros_msgs::srv::CommandLong>::SharedPtr client_;
   rclcpp::TimerBase::SharedPtr timer_;
+  size_t next_stream_idx_{0};
+  bool request_in_flight_{false};
 };
 
 int main(int argc, char** argv) {

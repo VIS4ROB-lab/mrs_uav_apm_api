@@ -73,6 +73,8 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
   rclcpp::Clock::SharedPtr clock_;
 
   rclcpp::CallbackGroup::SharedPtr callback_group_;
+  rclcpp::CallbackGroup::SharedPtr callback_group_service_servers_;
+  rclcpp::CallbackGroup::SharedPtr callback_group_service_clients_;
 
   // | --------------------- status methods --------------------- |
 
@@ -246,6 +248,10 @@ void MrsUavApmApi::initialize(
 
   callback_group_ = node_->create_callback_group(
       rclcpp::CallbackGroupType::MutuallyExclusive);
+  callback_group_service_servers_ = node_->create_callback_group(
+      rclcpp::CallbackGroupType::MutuallyExclusive);
+  callback_group_service_clients_ = node_->create_callback_group(
+      rclcpp::CallbackGroupType::MutuallyExclusive);
 
   last_mavros_state_time_ = rclcpp::Time(0, 0, clock_->get_clock_type());
 
@@ -334,18 +340,18 @@ void MrsUavApmApi::initialize(
       node_, "~/takeoff",
       std::bind(&MrsUavApmApi::callbackTakeoff, this, std::placeholders::_1,
                 std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), callback_group_);
+      rclcpp::SystemDefaultsQoS(), callback_group_service_servers_);
 
   // | --------------------- service clients -------------------- |
 
   sch_mavros_arming_ =
       mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandBool>(
-          node_, "~/mavros_arming_out", callback_group_);
+          node_, "~/mavros_arming_out", callback_group_service_clients_);
   sch_mavros_takeoff_ =
       mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandTOL>(
-          node_, "~/mavros_takeoff_out", callback_group_);
+          node_, "~/mavros_takeoff_out", callback_group_service_clients_);
   sch_mavros_mode_ = mrs_lib::ServiceClientHandler<mavros_msgs::srv::SetMode>(
-      node_, "~/mavros_set_mode_out", callback_group_);
+      node_, "~/mavros_set_mode_out", callback_group_service_clients_);
 
   // | ----------------------- subscribers ---------------------- |
 
