@@ -18,7 +18,6 @@
 
 #include <geometry_msgs/msg/quaternion_stamped.hpp>
 #include <mavros_msgs/msg/actuator_control.hpp>
-#include <mavros_msgs/msg/altitude.hpp>
 #include <mavros_msgs/msg/attitude_target.hpp>
 #include <mavros_msgs/msg/extended_state.hpp>
 #include <mavros_msgs/msg/gpsraw.hpp>
@@ -160,7 +159,6 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
   mrs_lib::SubscriberHandler<mavros_msgs::msg::ExtendedState>
       sh_mavros_extended_state_;
   mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry> sh_mavros_odometry_local_;
-  mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry> sh_mavros_odometry_in_;
   mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix> sh_mavros_gps_;
   mrs_lib::SubscriberHandler<sensor_msgs::msg::Range>
       sh_mavros_distance_sensor_;
@@ -170,7 +168,6 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
   mrs_lib::SubscriberHandler<sensor_msgs::msg::MagneticField>
       sh_mavros_magnetic_field_;
   mrs_lib::SubscriberHandler<mavros_msgs::msg::RCIn> sh_mavros_rc_;
-  mrs_lib::SubscriberHandler<mavros_msgs::msg::Altitude> sh_mavros_altitude_;
   mrs_lib::SubscriberHandler<mavros_msgs::msg::GPSRAW> sh_gps_status_raw_;
   mrs_lib::SubscriberHandler<sensor_msgs::msg::BatteryState> sh_mavros_battery_;
   /* mrs_lib::SubscriberHandler<mrs_modules_msgs::msg::Bestpos> sh_rtk_; */
@@ -180,7 +177,6 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
   void callbackMavrosExtendedState(
       const mavros_msgs::msg::ExtendedState::ConstSharedPtr msg);
   void callbackOdometryLocal(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
-  void callbackOdometryIn(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
   void callbackNavsatFix(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
   void callbackDistanceSensor(
       const sensor_msgs::msg::Range::ConstSharedPtr msg);
@@ -189,7 +185,6 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
   void callbackMagneticField(
       const sensor_msgs::msg::MagneticField::ConstSharedPtr msg);
   void callbackRC(const mavros_msgs::msg::RCIn::ConstSharedPtr msg);
-  void callbackAltitude(const mavros_msgs::msg::Altitude::ConstSharedPtr msg);
   void callbackGpsStatusRaw(const mavros_msgs::msg::GPSRAW::ConstSharedPtr msg);
   void callbackBattery(
       const sensor_msgs::msg::BatteryState::ConstSharedPtr msg);
@@ -391,9 +386,6 @@ void MrsUavApmApi::initialize(
           shopts, "~/mavros_local_position_in",
           &MrsUavApmApi::callbackOdometryLocal, this);
 
-  sh_mavros_odometry_in_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(
-      shopts, "~/mavros_odometry_in", &MrsUavApmApi::callbackOdometryIn, this);
-
   sh_mavros_gps_ = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(
       shopts, "~/mavros_global_position_in", &MrsUavApmApi::callbackNavsatFix,
       this);
@@ -418,9 +410,6 @@ void MrsUavApmApi::initialize(
 
   sh_mavros_rc_ = mrs_lib::SubscriberHandler<mavros_msgs::msg::RCIn>(
       shopts, "~/mavros_rc_in", &MrsUavApmApi::callbackRC, this);
-
-  sh_mavros_altitude_ = mrs_lib::SubscriberHandler<mavros_msgs::msg::Altitude>(
-      shopts, "~/mavros_altitude_in", &MrsUavApmApi::callbackAltitude, this);
 
   sh_gps_status_raw_ = mrs_lib::SubscriberHandler<mavros_msgs::msg::GPSRAW>(
       shopts, "~/mavros_gps_status_raw_in", &MrsUavApmApi::callbackGpsStatusRaw,
@@ -1021,21 +1010,6 @@ void MrsUavApmApi::callbackOdometryLocal(
   if (_capabilities_.produces_odometry) {
     common_handlers_->publishers.publishOdometry(*odom);
   }
-}
-
-//}
-
-/* callbackOdometryIn() //{ */
-
-void MrsUavApmApi::callbackOdometryIn(
-    const nav_msgs::msg::Odometry::ConstSharedPtr msg) {
-  if (!is_initialized_) {
-    return;
-  }
-
-  RCLCPP_INFO_ONCE(node_->get_logger(), "getting Mavros's odometry in");
-
-  auto odom = msg;
 
   // | ------------------- publish orientation ------------------ |
 
@@ -1076,6 +1050,17 @@ void MrsUavApmApi::callbackNavsatFix(
 
   if (_capabilities_.produces_gnss) {
     common_handlers_->publishers.publishGNSS(*msg);
+  }
+
+  RCLCPP_INFO_ONCE(node_->get_logger(), "getting Altitude");
+
+  if (_capabilities_.produces_altitude) {
+    mrs_msgs::msg::HwApiAltitude altitude_out;
+
+    altitude_out.stamp = msg->header.stamp;
+    altitude_out.amsl = msg->altitude;
+
+    common_handlers_->publishers.publishAltitude(altitude_out);
   }
 }
 
@@ -1186,29 +1171,7 @@ void MrsUavApmApi::callbackRC(
 
 //}
 
-/* callbackAltitude() //{ */
-
-void MrsUavApmApi::callbackAltitude(
-    const mavros_msgs::msg::Altitude::ConstSharedPtr msg) {
-  if (!is_initialized_) {
-    return;
-  }
-
-  RCLCPP_INFO_ONCE(node_->get_logger(), "getting Altitude");
-
-  if (_capabilities_.produces_altitude) {
-    mrs_msgs::msg::HwApiAltitude altitude_out;
-
-    altitude_out.stamp = msg->header.stamp;
-    altitude_out.amsl = msg->amsl;
-
-    common_handlers_->publishers.publishAltitude(altitude_out);
-  }
-}
-
-//}
-
-/* callbackAltitude() //{ */
+/* callbackGpsStatusRaw() //{ */
 
 void MrsUavApmApi::callbackGpsStatusRaw(
     const mavros_msgs::msg::GPSRAW::ConstSharedPtr msg) {
