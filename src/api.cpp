@@ -871,7 +871,7 @@ void MrsUavApmApi::timeoutMavrosState(void) {
 
   if (time.seconds() > _mavros_passable_delay_) {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000,
-                         "Not recieving Mavros state message for '%.3f s'! "
+                         "Not receiving Mavros state message for '%.3f s'! "
                          "Setup the PixHawk SD card!!",
                          time.seconds());
     RCLCPP_WARN_THROTTLE(

@@ -2,6 +2,7 @@
 #include <memory>
 #include <vector>
 
+#include "mavros_msgs/msg/state.hpp"
 #include "mavros_msgs/srv/command_long.hpp"
 #include "rclcpp/rclcpp.hpp"
 
@@ -30,6 +31,10 @@ class MavrosStreamEnforcer : public rclcpp::Node {
   MavrosStreamEnforcer() : Node("mavros_stream_enforcer") {
     client_ = this->create_client<mavros_msgs::srv::CommandLong>(
         "mavros/cmd/command");
+    state_sub_ = this->create_subscription<mavros_msgs::msg::State>(
+        "mavros/state", 1, [this](const mavros_msgs::msg::State::SharedPtr) {
+          state_received_ = true;
+        });
 
     timer_ = this->create_wall_timer(
         100ms, std::bind(&MavrosStreamEnforcer::enforce_tick, this));
@@ -40,6 +45,12 @@ class MavrosStreamEnforcer : public rclcpp::Node {
 
  private:
   void enforce_tick() {
+    if (!state_received_) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                           "Waiting for mavros/state messages...");
+      return;
+    }
+
     if (!client_->service_is_ready()) {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
                            "Waiting for mavros/cmd/command...");
@@ -87,9 +98,11 @@ class MavrosStreamEnforcer : public rclcpp::Node {
   }
 
   rclcpp::Client<mavros_msgs::srv::CommandLong>::SharedPtr client_;
+  rclcpp::Subscription<mavros_msgs::msg::State>::SharedPtr state_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
   size_t next_stream_idx_{0};
   bool request_in_flight_{false};
+  bool state_received_{false};
 };
 
 int main(int argc, char** argv) {
