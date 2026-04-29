@@ -84,15 +84,13 @@ def generate_launch_description():
 
     # Delay stream enforcer so MAVROS is fully connected
     ld.add_action(
-        TimerAction(
-            Node(
-                package='mrs_uav_apm_api',
-                executable='mavros_stream_enforcer',
-                namespace=uav_name,
-                name='mavros_stream_enforcer',
-                output='screen',
-            )
-        )       
+        Node(
+            package='mrs_uav_apm_api',
+            executable='mavros_stream_enforcer',
+            namespace=uav_name,
+            name='mavros_stream_enforcer',
+            output='screen',
+        )    
     )
 
     # Delay GP origin setter so MAVROS is fully connected and has a GPS fix (if available)
