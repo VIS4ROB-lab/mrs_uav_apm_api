@@ -20,9 +20,11 @@ static const std::vector<std::pair<uint32_t, double>> STREAMS = {
     {33, 10.0},   // GLOBAL_POSITION_INT
     {65, 10.0},   // RC_CHANNELS
     {83, 10.0},   // ATTITUDE_TARGET
+    {132, 10.0},  // DISTANCE_SENSOR
     {147, 10.0},  // BATTERY_STATUS
     {152, 10.0},  // MEM_INFO
     {165, 10.0},  // HWSTATUS
+    {173, 10.0},  // RANGEFINDER
     {245, 10.0},  // EXTENDED_SYS_STATE
 };
 
