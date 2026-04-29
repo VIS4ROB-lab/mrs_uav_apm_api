@@ -26,6 +26,8 @@
       - mag_calibration_status
       - odometry
       - vision_pose
+      - distance_sensor
+      - rangefinder
 
     # plugin_denylist:
       
@@ -53,8 +55,6 @@
       # # extras
       # - image_pub
       # - vibration
-      # - distance_sensor
-      # - rangefinder
       # - vision_speed_estimate
       # - apmflow
       # - mocap_pose_estimate
