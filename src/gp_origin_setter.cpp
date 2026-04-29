@@ -21,11 +21,12 @@ class GpOriginSetter : public rclcpp::Node {
 
  private:
   void callback(const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
-    if (msg->status.status == -1 && msg->altitude != 0) {
+    if (msg->status.status == -1 && msg->altitude != 0.0) {
       geographic_msgs::msg::GeoPointStamped origin_msg;
       origin_msg.header = msg->header;
-      origin_msg.position.latitude = msg->latitude;
-      origin_msg.position.longitude = msg->longitude;
+      origin_msg.header.stamp = get_clock()->now();
+      origin_msg.position.latitude = 0.0;
+      origin_msg.position.longitude = 0.0;
       origin_msg.position.altitude = msg->altitude;
 
       publisher_->publish(origin_msg);
