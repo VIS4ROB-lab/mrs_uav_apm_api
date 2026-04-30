@@ -817,16 +817,27 @@ std::tuple<bool, std::string> MrsUavApmApi::callbackArming(
     const bool& request) {
   std::stringstream ss;
 
-  auto srv_out = std::make_shared<mavros_msgs::srv::CommandBool::Request>();
+  auto srv_out = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
 
-  srv_out->value = request;
+  srv_out->broadcast = false;
+  srv_out->command = 400;  // the code for arming
+  srv_out->confirmation = true;
+
+  srv_out->param1 = request ? 1 : 0;  // arm or disarm?
+  srv_out->param2 =
+      request ? 0 : 21196;  // 21196 allows to disarm even in mid-flight
+  srv_out->param3 = 0;
+  srv_out->param4 = 0;
+  srv_out->param5 = 0;
+  srv_out->param6 = 0;
+  srv_out->param7 = 0;
 
   RCLCPP_INFO(node_->get_logger(), "calling for %s",
               request ? "arming" : "disarming");
 
   bool success = false;
 
-  auto response = sch_mavros_arming_.callSync(srv_out);
+  auto response = sch_mavros_command_long_.callSync(srv_out);
 
   if (response) {
     success = response.value()->success;
@@ -845,7 +856,7 @@ std::tuple<bool, std::string> MrsUavApmApi::callbackArming(
     }
 
   } else {
-    ss << "failed to call Mavros CommandBool service";
+    ss << "failed to call Mavros CommandLong service";
     RCLCPP_ERROR(node_->get_logger(), "%s", ss.str().c_str());
   }
 
