@@ -25,6 +25,7 @@
 #include <mavros_msgs/msg/rc_in.hpp>
 #include <mavros_msgs/msg/state.hpp>
 #include <mavros_msgs/srv/command_bool.hpp>
+#include <mavros_msgs/srv/command_long.hpp>
 #include <mavros_msgs/srv/command_tol.hpp>
 #include <mavros_msgs/srv/set_mode.hpp>
 #include <mrs_msgs/srv/vec1.hpp>
@@ -112,6 +113,7 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
       const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request,
       const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
   std::tuple<bool, std::string> callbackArming(const bool& request);
+  std::tuple<bool, std::string> callbackReboot(void);
   std::tuple<bool, std::string> callbackOffboard(void);
 
  private:
@@ -146,6 +148,8 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
 
   // | --------------------- service clients -------------------- |
 
+  mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandLong>
+      sch_mavros_command_long_;
   mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandBool>
       sch_mavros_arming_;
   mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandTOL>
@@ -339,6 +343,9 @@ void MrsUavApmApi::initialize(
 
   // | --------------------- service clients -------------------- |
 
+  sch_mavros_command_long_ =
+      mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandLong>(
+          node_, "~/mavros_cmd_out", callback_group_service_clients_);
   sch_mavros_arming_ =
       mrs_lib::ServiceClientHandler<mavros_msgs::srv::CommandBool>(
           node_, "~/mavros_arming_out", callback_group_service_clients_);
@@ -751,6 +758,55 @@ bool MrsUavApmApi::callbackTakeoff(
   response->success = success;
 
   return true;
+}
+
+//}
+
+/* callbackReboot() //{ */
+
+std::tuple<bool, std::string> MrsUavApmApi::callbackReboot(void) {
+  std::stringstream ss;
+
+  auto srv_out = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
+
+  srv_out->broadcast = false;
+  srv_out->command = 246;
+  srv_out->confirmation = true;
+
+  srv_out->param1 = 1;
+  srv_out->param2 = 0;
+  srv_out->param3 = 0;
+  srv_out->param4 = 0;
+  srv_out->param5 = 0;
+  srv_out->param6 = 0;
+  srv_out->param7 = 0;
+
+  RCLCPP_INFO(node_->get_logger(), "calling for reboot");
+
+  bool success = false;
+
+  auto response = sch_mavros_command_long_.callSync(srv_out);
+
+  if (response) {
+    success = response.value()->success;
+
+    if (success) {
+      ss << "service call for reboot was successful";
+      RCLCPP_INFO_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
+                                  "" << ss.str());
+
+    } else {
+      ss << "service call for reboot failed";
+      RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
+                                   "" << ss.str());
+    }
+
+  } else {
+    ss << "failed to call Mavros CommandLong service";
+    RCLCPP_ERROR(node_->get_logger(), "%s", ss.str().c_str());
+  }
+
+  return {success, ss.str()};
 }
 
 //}

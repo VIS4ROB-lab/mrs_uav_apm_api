@@ -137,6 +137,7 @@ def generate_launch_description():
                   ("~/mavros_gps_status_raw_in", "mavros/gpsstatus/gps1/raw"),
                   ("~/landed_state", "hw_api/landed_state"),
 
+                  ("~/mavros_cmd_out", "mavros/cmd/command"),
                   ("~/mavros_arming_out", "mavros/cmd/arming"),
                   ("~/mavros_takeoff_out", "mavros/cmd/takeoff"),
                   ("~/mavros_set_mode_out", "mavros/set_mode"),
