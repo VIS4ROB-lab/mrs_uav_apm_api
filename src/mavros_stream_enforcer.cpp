@@ -1,5 +1,6 @@
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "mavros_msgs/msg/state.hpp"
@@ -35,6 +36,9 @@ class MavrosStreamEnforcer : public rclcpp::Node {
     state_sub_ = this->create_subscription<mavros_msgs::msg::State>(
         "mavros/state", 1, [this](const mavros_msgs::msg::State::SharedPtr) {
           state_received_ = true;
+          if (!state_received_at_) {
+            state_received_at_ = std::chrono::steady_clock::now();
+          }
         });
 
     timer_ = this->create_wall_timer(
@@ -49,6 +53,11 @@ class MavrosStreamEnforcer : public rclcpp::Node {
     if (!state_received_) {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
                            "Waiting for mavros/state messages...");
+      return;
+    }
+
+    if (state_received_at_ &&
+        (std::chrono::steady_clock::now() - *state_received_at_) < 1s) {
       return;
     }
 
@@ -104,6 +113,7 @@ class MavrosStreamEnforcer : public rclcpp::Node {
   size_t next_stream_idx_{0};
   bool request_in_flight_{false};
   bool state_received_{false};
+  std::optional<std::chrono::steady_clock::time_point> state_received_at_;
 };
 
 int main(int argc, char** argv) {
