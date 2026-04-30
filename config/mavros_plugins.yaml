@@ -26,7 +26,6 @@
       - mag_calibration_status
       - odometry
       - vision_pose
-      - distance_sensor
       - rangefinder
 
     # plugin_denylist:
