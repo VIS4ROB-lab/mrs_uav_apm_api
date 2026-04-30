@@ -128,7 +128,7 @@ def generate_launch_description():
                   ("~/mavros_extended_state_in", "mavros/extended_state"),
                   ("~/mavros_local_position_in", "mavros/local_position/odom"),
                   ("~/mavros_global_position_in", "mavros/global_position/global"),
-                  ("~/mavros_garmin_in", "mavros/garmin"),
+                  ("~/mavros_garmin_in", "mavros/rangefinder/rangefinder"),
                   ("~/mavros_imu_in", "mavros/imu/data"),
                   ("~/mavros_magnetometer_in", "mavros/global_position/compass_hdg"),
                   ("~/mavros_magnetic_field_in", "mavros/imu/mag"),
