@@ -1130,7 +1130,7 @@ void MrsUavApmApi::callbackDistanceSensor(
     return;
   }
 
-  RCLCPP_INFO_ONCE(node_->get_logger(), "getting distnace sensor");
+  RCLCPP_INFO_ONCE(node_->get_logger(), "getting distance sensor");
 
   if (_capabilities_.produces_distance_sensor) {
     auto msg_out = *msg;
