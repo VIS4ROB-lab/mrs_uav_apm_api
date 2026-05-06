@@ -115,6 +115,7 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
   std::tuple<bool, std::string> callbackArming(const bool& request);
   std::tuple<bool, std::string> callbackReboot(void);
   std::tuple<bool, std::string> callbackOffboard(void);
+  std::tuple<bool, std::string> callbackLoiter(void);
 
  private:
   bool is_initialized_ = false;
@@ -817,6 +818,8 @@ std::tuple<bool, std::string> MrsUavApmApi::callbackArming(
     const bool& request) {
   std::stringstream ss;
 
+  callbackLoiter();
+
   auto srv_out = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
 
   srv_out->broadcast = false;
@@ -889,6 +892,43 @@ std::tuple<bool, std::string> MrsUavApmApi::callbackOffboard(void) {
 
     } else {
       ss << "switched to offboard mode";
+      success = true;
+    }
+  } else {
+    ss << "failed to call Mavros SetMode service";
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "%s",
+                          ss.str().c_str());
+  }
+
+  return {success, ss.str()};
+}
+
+//}
+
+/* callbackLoiter() //{ */
+
+std::tuple<bool, std::string> MrsUavApmApi::callbackLoiter(void) {
+  std::stringstream ss;
+
+  auto srv_out = std::make_shared<mavros_msgs::srv::SetMode::Request>();
+
+  srv_out->base_mode = 0;
+  srv_out->custom_mode = "LOITER";
+
+  bool success = false;
+
+  auto response = sch_mavros_mode_.callSync(srv_out);
+
+  if (response) {
+    if (response.value()->mode_sent != 1) {
+      ss << "service call for loiter failed, returned "
+         << response.value()->mode_sent;
+
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "%s",
+                           ss.str().c_str());
+
+    } else {
+      ss << "switched to loiter mode";
       success = true;
     }
   } else {
