@@ -24,7 +24,7 @@ def generate_launch_description():
     uav_name = os.getenv("UAV_NAME", "uav")
     uav_id = os.getenv("UAV_ID", "1")
     use_sim_time=os.getenv('USE_SIM_TIME', "false") == "true"
-    respawn_mavros=os.getenv('respawn_mavros', "false") == "true"
+    respawn_mavros=os.getenv('respawn_mavros', "true") == "true"
 
     # Declare fcu_url as a launch argument
     ld.add_action(DeclareLaunchArgument(
@@ -63,6 +63,7 @@ def generate_launch_description():
         "log_output": "screen",
         "fcu_protocol": "v2.0",
         "respawn_mavros": str(respawn_mavros),
+        "use_sim_time": str(use_sim_time),
         "namespace": uav_name + "/mavros",
         "pluginlists_yaml":  this_pkg_path + "/config/mavros_plugins.yaml",
         "config_yaml": config_yaml_path,
@@ -82,27 +83,27 @@ def generate_launch_description():
         )
     )
 
-    # Delay stream enforcer so MAVROS is fully connected
-    ld.add_action(
-        Node(
-            package='mrs_uav_apm_api',
-            executable='mavros_stream_enforcer',
-            namespace=uav_name,
-            name='mavros_stream_enforcer',
-            output='screen',
-        )    
-    )
+    # # Delay stream enforcer so MAVROS is fully connected
+    # ld.add_action(
+    #     Node(
+    #         package='mrs_uav_apm_api',
+    #         executable='mavros_stream_enforcer',
+    #         namespace=uav_name,
+    #         name='mavros_stream_enforcer',
+    #         output='screen',
+    #     )    
+    # )
 
-    # Delay GP origin setter so MAVROS is fully connected and has a GPS fix (if available)
-    ld.add_action(
-        Node(
-            package='mrs_uav_apm_api',
-            executable='gp_origin_setter',
-            namespace=uav_name,
-            name='gp_origin_setter',
-            output='screen',
-        )
-    )
+    # # Delay GP origin setter so MAVROS is fully connected and has a GPS fix (if available)
+    # ld.add_action(
+    #     Node(
+    #         package='mrs_uav_apm_api',
+    #         executable='gp_origin_setter',
+    #         namespace=uav_name,
+    #         name='gp_origin_setter',
+    #         output='screen',
+    #     )
+    # )
 
     return ld
 

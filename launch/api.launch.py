@@ -135,6 +135,7 @@ def generate_launch_description():
                   ("~/mavros_rc_in", "mavros/rc/in"),
                   ("~/mavros_battery_in", "mavros/battery"),
                   ("~/mavros_gps_status_raw_in", "mavros/gpsstatus/gps1/raw"),
+                  ("~/mavros_status_text_in", "mavros/statustext/recv"),
                   ("~/landed_state", "hw_api/landed_state"),
 
                   ("~/mavros_cmd_out", "mavros/cmd/command"),
@@ -144,7 +145,7 @@ def generate_launch_description():
                   ("~/mavros_position_setpoint_out", "mavros/setpoint_raw/local"),
                   ("~/mavros_attitude_setpoint_out", "mavros/setpoint_raw/attitude"),
                   ("~/mavros_actuator_control_out", "mavros/actuator_control"),
-
+                  ("~/mavros_set_gp_origin_out", "mavros/global_position/set_gp_origin"),
                 ],
             )
 

@@ -24,6 +24,7 @@
 #include <mavros_msgs/msg/position_target.hpp>
 #include <mavros_msgs/msg/rc_in.hpp>
 #include <mavros_msgs/msg/state.hpp>
+#include <mavros_msgs/msg/status_text.hpp>
 #include <mavros_msgs/srv/command_bool.hpp>
 #include <mavros_msgs/srv/command_long.hpp>
 #include <mavros_msgs/srv/command_tol.hpp>
@@ -32,6 +33,8 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/u_int8.hpp>
+
+#include "geographic_msgs/msg/geo_point_stamped.hpp"
 
 //}
 
@@ -54,6 +57,25 @@ typedef mrs_lib::ThreadTimer TimerType;
 #endif
 
 //}
+
+static constexpr uint16_t MAV_CMD_SET_MESSAGE_INTERVAL = 511;
+
+// (message_id, rate_hz)
+static const std::vector<std::pair<uint32_t, double>> STREAMS = {
+    {0, 100.0},   // HEARTBEAT
+    {1, 10.0},    // SYS_STATUS
+    {27, 100.0},  // RAW_IMU
+    {30, 100.0},  // ATTITUDE
+    {32, 100.0},  // LOCAL_POSITION_NED
+    {33, 10.0},   // GLOBAL_POSITION_INT
+    {65, 10.0},   // RC_CHANNELS
+    {83, 10.0},   // ATTITUDE_TARGET
+    {147, 10.0},  // BATTERY_STATUS
+    {152, 10.0},  // MEM_INFO
+    {165, 10.0},  // HWSTATUS
+    {173, 10.0},  // RANGEFINDER
+    {245, 10.0},  // EXTENDED_SYS_STATE
+};
 
 namespace mrs_uav_apm_api {
 
@@ -119,6 +141,11 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
 
  private:
   bool is_initialized_ = false;
+  bool gp_origin_set_ = false;
+  int field_elevation_counter_ = 0;
+
+  Eigen::VectorXi message_rates_set_ =
+      Eigen::VectorXi::Constant(STREAMS.size(), false);
 
   std::shared_ptr<mrs_uav_hw_api::CommonHandlers_t> common_handlers_;
 
@@ -175,14 +202,18 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
   mrs_lib::SubscriberHandler<mavros_msgs::msg::RCIn> sh_mavros_rc_;
   mrs_lib::SubscriberHandler<mavros_msgs::msg::GPSRAW> sh_gps_status_raw_;
   mrs_lib::SubscriberHandler<sensor_msgs::msg::BatteryState> sh_mavros_battery_;
+  mrs_lib::SubscriberHandler<mavros_msgs::msg::StatusText>
+      sh_mavros_status_text_;
   /* mrs_lib::SubscriberHandler<mrs_modules_msgs::msg::Bestpos> sh_rtk_; */
 
   void callbackGroundTruth(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
   void callbackMavrosState(const mavros_msgs::msg::State::ConstSharedPtr msg);
+  void setMessageRates();
   void callbackMavrosExtendedState(
       const mavros_msgs::msg::ExtendedState::ConstSharedPtr msg);
   void callbackOdometryLocal(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
   void callbackNavsatFix(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
+  void setGpOrigin(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
   void callbackDistanceSensor(
       const sensor_msgs::msg::Range::ConstSharedPtr msg);
   void callbackImu(const sensor_msgs::msg::Imu::ConstSharedPtr msg);
@@ -193,6 +224,8 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
   void callbackGpsStatusRaw(const mavros_msgs::msg::GPSRAW::ConstSharedPtr msg);
   void callbackBattery(
       const sensor_msgs::msg::BatteryState::ConstSharedPtr msg);
+  void callbackStatusText(
+      const mavros_msgs::msg::StatusText::ConstSharedPtr msg);
   /* void                                                 callbackRTK(const
    * mrs_modules_msgs::msg::Bestpos::ConstSharedPtr msg); */
 
@@ -209,6 +242,8 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
   mrs_lib::PublisherHandler<mavros_msgs::msg::PositionTarget>
       ph_mavros_position_target_;
   mrs_lib::PublisherHandler<std_msgs::msg::UInt8> ph_landed_state_;
+  mrs_lib::PublisherHandler<geographic_msgs::msg::GeoPointStamped>
+      ph_mavros_set_gp_origin_;
 
   // | ------------------------- timers ------------------------- |
 
@@ -427,6 +462,11 @@ void MrsUavApmApi::initialize(
       mrs_lib::SubscriberHandler<sensor_msgs::msg::BatteryState>(
           shopts, "~/mavros_battery_in", &MrsUavApmApi::callbackBattery, this);
 
+  sh_mavros_status_text_ =
+      mrs_lib::SubscriberHandler<mavros_msgs::msg::StatusText>(
+          shopts, "~/mavros_status_text_in", &MrsUavApmApi::callbackStatusText,
+          this);
+
   // | ----------------------- publishers ----------------------- |
 
   ph_mavros_attitude_target_ =
@@ -440,6 +480,9 @@ void MrsUavApmApi::initialize(
           node_, "~/mavros_position_setpoint_out");
   ph_landed_state_ =
       mrs_lib::PublisherHandler<std_msgs::msg::UInt8>(node_, "~/landed_state");
+  ph_mavros_set_gp_origin_ =
+      mrs_lib::PublisherHandler<geographic_msgs::msg::GeoPointStamped>(
+          node_, "~/mavros_set_gp_origin_out");
 
   // | ----------------------- finish init ---------------------- |
 
@@ -768,6 +811,12 @@ bool MrsUavApmApi::callbackTakeoff(
 std::tuple<bool, std::string> MrsUavApmApi::callbackReboot(void) {
   std::stringstream ss;
 
+  if (armed_) {
+    ss << "cannot reboot while armed, disarm first";
+    RCLCPP_ERROR(node_->get_logger(), "%s", ss.str().c_str());
+    return {false, ss.str()};
+  }
+
   auto srv_out = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
 
   srv_out->broadcast = false;
@@ -795,7 +844,9 @@ std::tuple<bool, std::string> MrsUavApmApi::callbackReboot(void) {
       ss << "service call for reboot was successful";
       RCLCPP_INFO_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
                                   "" << ss.str());
-
+      gp_origin_set_ = false;
+      field_elevation_counter_ = 0;
+      message_rates_set_ = Eigen::VectorXi::Constant(STREAMS.size(), false);
     } else {
       ss << "service call for reboot failed";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
@@ -1026,6 +1077,8 @@ void MrsUavApmApi::callbackMavrosState(
 
   RCLCPP_INFO_ONCE(node_->get_logger(), "getting Mavros state");
 
+  setMessageRates();
+
   {
     std::scoped_lock lock(mutex_status_);
 
@@ -1055,6 +1108,63 @@ void MrsUavApmApi::callbackMavrosState(
                        last_mavros_state_time_);
 
   common_handlers_->publishers.publishStatus(status);
+}
+
+//}
+
+/* //{ setMessageRates() */
+
+void MrsUavApmApi::setMessageRates() {
+  if (message_rates_set_.all()) {
+    return;
+  }
+
+  int i = 0;
+  for (const auto& stream : STREAMS) {
+    std::stringstream ss;
+    auto req = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
+
+    if (message_rates_set_[i]) {
+      continue;
+    }
+
+    req->command = MAV_CMD_SET_MESSAGE_INTERVAL;
+    req->param1 = static_cast<float>(stream.first);
+    req->param2 = static_cast<float>(1e6 / stream.second);
+    req->param3 = 0.0f;
+    req->param4 = 0.0f;
+    req->param5 = 0.0f;
+    req->param6 = 0.0f;
+    req->param7 = 0.0f;
+
+    RCLCPP_INFO(node_->get_logger(),
+                "setting message rate for stream %d to %f Hz", stream.first,
+                stream.second);
+
+    bool success = false;
+    auto response = sch_mavros_command_long_.callSync(req);
+
+    if (response) {
+      success = response.value()->success;
+
+      if (success) {
+        ss << "set message rate for stream " << stream.first << " to "
+           << stream.second << " Hz was successful";
+        RCLCPP_INFO_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
+                                    "" << ss.str());
+        message_rates_set_[i] = true;
+      } else {
+        ss << "service call for setting message rate failed";
+        RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
+                                     "" << ss.str());
+      }
+
+    } else {
+      ss << "failed to call Mavros CommandLong service";
+      RCLCPP_ERROR(node_->get_logger(), "%s", ss.str().c_str());
+    }
+    i++;
+  }
 }
 
 //}
@@ -1153,6 +1263,8 @@ void MrsUavApmApi::callbackNavsatFix(
     return;
   }
 
+  setGpOrigin(msg);
+
   RCLCPP_INFO_ONCE(node_->get_logger(), "getting NavSat fix");
 
   if (_capabilities_.produces_gnss) {
@@ -1168,6 +1280,36 @@ void MrsUavApmApi::callbackNavsatFix(
     altitude_out.amsl = msg->altitude;
 
     common_handlers_->publishers.publishAltitude(altitude_out);
+  }
+}
+
+//}
+
+/* setGpOrigin() //{ */
+
+void MrsUavApmApi::setGpOrigin(
+    const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg) {
+  if (gp_origin_set_) {
+    return;
+  }
+
+  if (msg->status.status == -1 && msg->altitude != 0.0) {
+    geographic_msgs::msg::GeoPointStamped origin_msg;
+    origin_msg.header = msg->header;
+    origin_msg.position.latitude = 0.0;
+    origin_msg.position.longitude = 0.0;
+    origin_msg.position.altitude = msg->altitude;
+
+    ph_mavros_set_gp_origin_.publish(origin_msg);
+
+    RCLCPP_INFO(node_->get_logger(),
+                "Published set_gp_origin due to GPS status -1");
+    gp_origin_set_ = true;
+  } else if (msg->status.status != -1) {
+    RCLCPP_INFO(node_->get_logger(),
+                "Received one GPS message with status %d, not publishing",
+                msg->status.status);
+    gp_origin_set_ = true;
   }
 }
 
@@ -1352,6 +1494,34 @@ void MrsUavApmApi::callbackBattery(
 
   if (_capabilities_.produces_battery_state) {
     common_handlers_->publishers.publishBatteryState(*msg);
+  }
+}
+
+//}
+
+/* callbackStatusText() //{ */
+
+void MrsUavApmApi::callbackStatusText(
+    const mavros_msgs::msg::StatusText::ConstSharedPtr msg) {
+  if (!is_initialized_) {
+    return;
+  }
+
+  RCLCPP_INFO_ONCE(node_->get_logger(), "getting status text");
+
+  if (msg->text.find("Field Elevation Set") != std::string::npos) {
+    RCLCPP_INFO(node_->get_logger(),
+                "Received status text indicating that the field elevation has "
+                "been set");
+    field_elevation_counter_++;
+  }
+
+  if (field_elevation_counter_ > 1) {
+    callbackReboot();
+  }
+  if (gp_origin_set_ && message_rates_set_.all() &&
+      field_elevation_counter_ == 0) {
+    callbackReboot();
   }
 }
 
