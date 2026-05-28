@@ -1516,13 +1516,13 @@ void MrsUavApmApi::callbackStatusText(
     field_elevation_counter_++;
   }
 
-  if (field_elevation_counter_ > 1) {
-    callbackReboot();
-  }
-  if (gp_origin_set_ && message_rates_set_.all() &&
-      field_elevation_counter_ == 0) {
-    callbackReboot();
-  }
+  // if (field_elevation_counter_ > 1) {
+  //   callbackReboot();
+  // }
+  // if (gp_origin_set_ && message_rates_set_.all() &&
+  //     field_elevation_counter_ == 0) {
+  //   callbackReboot();
+  // }
 }
 
 //}
