@@ -18,7 +18,7 @@
 	<arg name="odom_frame_id" default="odom"/>
 	<arg name="map_frame_id" default="map"/>
 
-	<node pkg="mavros" exec="mavros_node" namespace="$(var namespace)" output="screen" respawn="$(var respawn_mavros)" respawn_delay="5">
+	<node pkg="mavros" exec="mavros_node" namespace="$(var namespace)" output="screen" respawn="$(var respawn_mavros)" respawn_delay="5.0">
 		<param name="fcu_url" value="$(var fcu_url)" />
 		<param name="gcs_url" value="$(var gcs_url)" />
 		<param name="tgt_system" value="$(var tgt_system)" />
