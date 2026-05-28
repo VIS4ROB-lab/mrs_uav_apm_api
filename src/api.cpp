@@ -1123,7 +1123,7 @@ void MrsUavApmApi::setMessageRates() {
   }
 
   const auto now = clock_->now();
-  if ((now - last_reboot_time_).seconds() < 10.0) {
+  if ((now - last_reboot_time_).seconds() < 15.0) {
     RCLCPP_DEBUG(node_->get_logger(),
                  "waiting for reboot settle time before setting message rates");
     return;
@@ -1304,7 +1304,7 @@ void MrsUavApmApi::setGpOrigin(
   }
 
   const auto now = clock_->now();
-  if ((now - last_reboot_time_).seconds() < 10.0) {
+  if ((now - last_reboot_time_).seconds() < 15.0) {
     RCLCPP_DEBUG(node_->get_logger(),
                  "waiting for reboot settle time before setting GP origin");
     return;
