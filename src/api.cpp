@@ -150,6 +150,7 @@ class MrsUavApmApi : public mrs_uav_hw_api::MrsUavHwApi {
   std::shared_ptr<mrs_uav_hw_api::CommonHandlers_t> common_handlers_;
 
   rclcpp::Time last_mavros_state_time_;
+  rclcpp::Time last_reboot_time_;
   std::mutex mutex_last_mavros_state_time_;
 
   // | ----------------------- parameters ----------------------- |
@@ -288,6 +289,7 @@ void MrsUavApmApi::initialize(
   callback_group_service_clients_ = node_->create_callback_group(
       rclcpp::CallbackGroupType::MutuallyExclusive);
 
+  last_reboot_time_ = rclcpp::Time(0, 0, clock_->get_clock_type());
   last_mavros_state_time_ = rclcpp::Time(0, 0, clock_->get_clock_type());
 
   // | ------------------- loading parameters ------------------- |
@@ -847,6 +849,7 @@ std::tuple<bool, std::string> MrsUavApmApi::callbackReboot(void) {
       gp_origin_set_ = false;
       field_elevation_counter_ = 0;
       message_rates_set_ = Eigen::VectorXi::Constant(STREAMS.size(), false);
+      last_reboot_time_ = clock_->now();
     } else {
       ss << "service call for reboot failed";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000,
@@ -1119,6 +1122,13 @@ void MrsUavApmApi::setMessageRates() {
     return;
   }
 
+  const auto now = clock_->now();
+  if ((now - last_reboot_time_).seconds() < 1.0) {
+    RCLCPP_DEBUG(node_->get_logger(),
+                 "waiting for reboot settle time before setting message rates");
+    return;
+  }
+
   int i = 0;
   for (const auto& stream : STREAMS) {
     std::stringstream ss;
@@ -1290,6 +1300,13 @@ void MrsUavApmApi::callbackNavsatFix(
 void MrsUavApmApi::setGpOrigin(
     const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg) {
   if (gp_origin_set_) {
+    return;
+  }
+
+  const auto now = clock_->now();
+  if ((now - last_reboot_time_).seconds() < 1.0) {
+    RCLCPP_DEBUG(node_->get_logger(),
+                 "waiting for reboot settle time before setting GP origin");
     return;
   }
 
